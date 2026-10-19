@@ -1,0 +1,1 @@
+"""ReviveOS core package."""

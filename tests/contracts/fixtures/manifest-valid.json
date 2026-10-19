@@ -1,0 +1,1 @@
+{"format":"revive/v1","source":{"repo":"https://github.com/x/y","commit":"abcdefg"},"genome_ref":"genome.json","behavior":{"compatibility":"full"},"score":{"total":80,"components":{}},"patches":[],"sbom_digest":"sha256:x","provenance":{"evidence":[],"llm_traces":[]},"status":"alive"}

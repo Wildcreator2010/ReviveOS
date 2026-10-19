@@ -1,0 +1,59 @@
+{
+  "name": "desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ReviveOS Software ICU desktop console (Electron shell around the exported web console)",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "electron .",
+    "build:web": "pnpm --filter web build",
+    "dist": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:dir": "npm run build && electron-builder --win --dir --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.5.0"
+  },
+  "build": {
+    "appId": "dev.reviveos.icu",
+    "productName": "ReviveOS ICU",
+    "copyright": "ReviveOS",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "web/**/*",
+      "package.json",
+      "!**/*.map",
+      "!**/*.ts"
+    ],
+    "asar": true,
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ReviveOS ICU",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

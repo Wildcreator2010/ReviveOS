@@ -1,0 +1,12 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.11-slim AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/apps/api/src:/app/agents/src:/app/packages/core/src
+WORKDIR /app
+COPY packages/core /app/packages/core
+COPY agents /app/agents
+COPY apps/api /app/apps/api
+RUN pip install --no-cache-dir /app/packages/core /app/agents /app/apps/api && useradd --create-home --uid 10001 revive
+USER 10001
+EXPOSE 8000
+HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"
+CMD ["uvicorn", "revive_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

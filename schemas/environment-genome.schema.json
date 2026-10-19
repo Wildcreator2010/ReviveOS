@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reviveos.dev/schemas/environment-genome.schema.json",
+  "title": "Environment genome",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "python",
+    "os",
+    "dependencies",
+    "cuda",
+    "system_libs",
+    "overall_confidence"
+  ],
+  "properties": {
+    "python": {
+      "$ref": "#/$defs/inference"
+    },
+    "os": {
+      "$ref": "#/$defs/inference"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "version",
+          "source",
+          "confidence",
+          "evidence"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "evidence": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      }
+    },
+    "cuda": {
+      "$ref": "#/$defs/inference"
+    },
+    "system_libs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/inference"
+      }
+    },
+    "overall_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_kind",
+          "reference"
+        ],
+        "properties": {
+          "source_kind": {
+            "enum": [
+              "git_history",
+              "manifest_file",
+              "ci_config",
+              "doc",
+              "release_artifact",
+              "inference"
+            ]
+          },
+          "reference": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence",
+        "evidence"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    }
+  }
+}

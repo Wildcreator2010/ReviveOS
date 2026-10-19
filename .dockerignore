@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+.uv-cache
+.uv-python
+.tools
+node_modules
+apps/web/.next
+apps/web/node_modules
+apps/desktop/node_modules
+*.pyc
+__pycache__
+pytest-cache-files-*

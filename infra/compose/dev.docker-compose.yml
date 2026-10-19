@@ -1,0 +1,96 @@
+# ReviveOS dev dependencies (T-INIT-04).
+#
+# Long-running services and their fixed ports:
+#   postgres  pgvector/pgvector:pg16   5432
+#   redis     redis:7-alpine           6379
+#   minio     minio/minio              9000 (S3) / 9001 (console)
+#
+# `minio-init` is a one-shot bucket bootstrapper behind the "bootstrap" profile,
+# so a plain `docker compose up -d` still starts exactly the three services above.
+# `make dev` runs both.
+#
+# Docker cannot be reached from inside the DSH sandbox (named-pipe access is
+# blocked). Run this from an unsandboxed terminal; see docs/dev-environment.md.
+#
+# Red line: no privileged containers, no cap_add, no host path mounts.
+name: reviveos-dev
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: reviveos-dev-postgres
+    environment:
+      POSTGRES_USER: revive
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-revive}
+      POSTGRES_DB: revive
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U revive -d revive"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: reviveos-dev-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: reviveos-dev-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-revive}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-revive-dev-only}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      # MinIO removed then re-added a static curl into the release image; the
+      # health endpoint is the only probe that needs no extra client. Do not
+      # replace with `mc ready local`: that needs an alias the image does not set.
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: reviveos-dev-minio-init
+    profiles: ["bootstrap"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc mb --ignore-existing local/capsules local/artifacts &&
+        mc anonymous set none local/capsules &&
+        mc anonymous set none local/artifacts
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-revive}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-revive-dev-only}
+    restart: "no"
+
+volumes:
+  postgres-data:
+  minio-data:

@@ -1,0 +1,11 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.11-slim AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/apps/api/src:/app/agents/src:/app/packages/core/src
+WORKDIR /app
+COPY packages/core /app/packages/core
+COPY agents /app/agents
+COPY apps/api /app/apps/api
+RUN pip install --no-cache-dir '/app/packages/core[docker]' '/app/agents[graph]' /app/apps/api \
+    && useradd --create-home --uid 10001 revive
+USER 10001
+CMD ["celery", "-A", "revive_api.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=revive", "--concurrency=2"]

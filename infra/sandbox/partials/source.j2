@@ -1,0 +1,18 @@
+# --- install channel: source compile (python.org, official) ---------------
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    {{ extra_apt | pkgjoin }} \
+ && rm -rf /var/lib/apt/lists/*
+ARG PYTHON_SOURCE_URL=https://www.python.org/ftp/python/{{ source_release }}/Python-{{ source_release }}.tgz
+RUN curl -fsSL "$PYTHON_SOURCE_URL" -o /tmp/python.tgz \
+ && mkdir -p /usr/src/python \
+ && tar -xzf /tmp/python.tgz -C /usr/src/python --strip-components=1 \
+ && rm -f /tmp/python.tgz
+RUN cd /usr/src/python \
+ && ./configure --prefix=/usr/local --with-ensurepip=install \
+ && make -j"$(nproc)" \
+ && make altinstall \
+ && rm -rf /usr/src/python
+RUN python{{ python_version }} -m ensurepip --upgrade \
+ && python{{ python_version }} -m pip install --upgrade pip setuptools wheel
+

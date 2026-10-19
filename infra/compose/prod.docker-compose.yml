@@ -1,0 +1,68 @@
+name: reviveos-prod
+
+services:
+  api:
+    image: ${REVIVE_API_IMAGE:?Set REVIVE_API_IMAGE to the GHCR image path}@sha256:${API_DIGEST:?API_DIGEST must be set to a published digest}
+    restart: unless-stopped
+    env_file: [../../infra/envs/revive.prod.env]
+    environment:
+      REVIVE_WORKER__TOKEN: ${REVIVE_WORKER_TOKEN:?REVIVE_WORKER_TOKEN must be set}
+      DATABASE_URL: postgresql+asyncpg://revive:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/revive
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+    expose: ["8000"]
+    healthcheck: {test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"], interval: 10s, timeout: 3s, retries: 5}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+  migrate:
+    image: ${REVIVE_API_IMAGE:?Set REVIVE_API_IMAGE to the GHCR image path}@sha256:${API_DIGEST:?API_DIGEST must be set to a published digest}
+    restart: "no"
+    env_file: [../../infra/envs/revive.prod.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://revive:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/revive
+    command: ["python", "-m", "alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
+    depends_on:
+      postgres: {condition: service_healthy}
+  worker:
+    image: ${REVIVE_WORKER_IMAGE:?Set REVIVE_WORKER_IMAGE to the GHCR image path}@sha256:${WORKER_DIGEST:?WORKER_DIGEST must be set to a published digest}
+    restart: unless-stopped
+    env_file: [../../infra/envs/revive.prod.env]
+    environment:
+      REVIVE_WORKER__TOKEN: ${REVIVE_WORKER_TOKEN:?REVIVE_WORKER_TOKEN must be set}
+      DATABASE_URL: postgresql+asyncpg://revive:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/revive
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+    volumes: [/var/run/docker.sock:/var/run/docker.sock]
+    group_add: ["${DOCKER_GID:?DOCKER_GID must be set to the host docker group id}"]
+  postgres:
+    image: postgres:16@sha256:${POSTGRES_DIGEST:?POSTGRES_DIGEST must be set}
+    restart: unless-stopped
+    env_file: [../../infra/envs/revive.prod.env]
+    expose: ["5432"]
+    environment:
+      POSTGRES_USER: revive
+      POSTGRES_DB: revive
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: {test: [CMD-SHELL, pg_isready -U revive -d revive], interval: 10s, timeout: 5s, retries: 5}
+  redis:
+    image: redis:7@sha256:${REDIS_DIGEST:?REDIS_DIGEST must be set}
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"]
+    expose: ["6379"]
+    healthcheck: {test: [CMD, redis-cli, "-a", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}", ping], interval: 10s, timeout: 3s, retries: 5}
+    volumes: [redisdata:/data]
+  web:
+    image: ${REVIVE_WEB_IMAGE:?Set REVIVE_WEB_IMAGE to the GHCR image path}@sha256:${WEB_DIGEST:?WEB_DIGEST must be set to a published digest}
+    restart: unless-stopped
+    expose: ["80"]
+    depends_on: {api: {condition: service_healthy}}
+  caddy:
+    image: caddy:2@sha256:${CADDY_DIGEST:?CADDY_DIGEST must be set}
+    restart: unless-stopped
+    environment:
+      REVIVE_DOMAIN: ${REVIVE_DOMAIN:?REVIVE_DOMAIN must be set}
+    ports: ["80:80", "443:443"]
+    volumes: [./caddy/Caddyfile:/etc/caddy/Caddyfile:ro, caddydata:/data, caddyconfig:/config]
+    depends_on: {web: {condition: service_started}}
+volumes: {pgdata: {}, redisdata: {}, caddydata: {}, caddyconfig: {}}

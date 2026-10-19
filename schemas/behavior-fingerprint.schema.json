@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reviveos.dev/schemas/behavior-fingerprint.schema.json",
+  "title": "Behavior fingerprint",
+  "description": "T-SB-06 fifth core contract. Records the observable behaviour of a case run inside a sandbox. Only hashes and bounded excerpts are stored: raw stdout/stderr never enters the fingerprint, so user data cannot leak through it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "plan_ref",
+    "captured_at",
+    "cases"
+  ],
+  "properties": {
+    "format": {
+      "const": "revive/behavior-fingerprint/v1"
+    },
+    "plan_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "baseline_source": {
+      "$ref": "#/$defs/baselineSource"
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "baselineSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "priority",
+        "kind",
+        "reference"
+      ],
+      "properties": {
+        "priority": {
+          "enum": [
+            1,
+            2,
+            3
+          ],
+          "description": "1 = repo-bundled expected outputs, 2 = original tag replayed in the historic image, 3 = values declared by README/paper and entered by a human."
+        },
+        "kind": {
+          "enum": [
+            "repo_expected_outputs",
+            "original_tag_replay",
+            "declared_values"
+          ]
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "fileDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "glob",
+        "sha256"
+      ],
+      "properties": {
+        "glob": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "numericSeries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "values",
+        "dtype"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "dtype": {
+          "enum": [
+            "float",
+            "int"
+          ]
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "exit_code",
+        "stdout_hash"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "stdout_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "stderr_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "stdout_excerpt_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "output_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileDigest"
+          }
+        },
+        "numeric_series": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/numericSeries"
+          }
+        },
+        "structural": {
+          "type": [
+            "object",
+            "array",
+            "null"
+          ],
+          "description": "JSON-shaped projection of stdout for structural tolerance (key tree + leaf values)."
+        }
+      }
+    }
+  }
+}

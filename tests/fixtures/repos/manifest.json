@@ -1,0 +1,45 @@
+{
+  "generator": "make_fixtures.py",
+  "git_dates": "fixed GIT_AUTHOR_DATE/GIT_COMMITTER_DATE so hashes are reproducible",
+  "fixtures": [
+    {
+      "name": "py27-flask",
+      "python": "2.7",
+      "python_min_confidence": 0.9,
+      "expected_error_category": "R07",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "three-era-deps",
+      "python": null,
+      "timeline_length": 3,
+      "expected_error_category": "R03",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "healthy-baseline",
+      "python": "3.11",
+      "expected_error_category": null,
+      "license": "MIT"
+    },
+    {
+      "name": "ambiguous-readme",
+      "python": null,
+      "max_overall_confidence": 0.7,
+      "expected_error_category": null,
+      "license": "MIT"
+    },
+    {
+      "name": "modern-uvicorn",
+      "python": "3.9",
+      "expected_error_category": "R02",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "name": "collections-abc",
+      "python": "3.9",
+      "expected_error_category": "R01",
+      "license": "PSF-2.0"
+    }
+  ]
+}

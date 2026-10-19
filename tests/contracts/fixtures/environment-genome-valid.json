@@ -1,0 +1,24 @@
+{
+  "python": {
+    "version": "3.11",
+    "confidence": 0.9,
+    "evidence": [
+      {
+        "source_kind": "manifest_file",
+        "reference": "pyproject.toml"
+      }
+    ]
+  },
+  "os": {
+    "image": "ubuntu:22.04",
+    "confidence": 0.8,
+    "evidence": []
+  },
+  "dependencies": [],
+  "cuda": {
+    "confidence": 0,
+    "evidence": []
+  },
+  "system_libs": [],
+  "overall_confidence": 0.85
+}

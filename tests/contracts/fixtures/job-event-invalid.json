@@ -1,0 +1,11 @@
+{
+  "id": "event-7",
+  "job_id": "job-1",
+  "project_id": "project-1",
+  "ts": "2026-01-01T00:00:00Z",
+  "type": "job.succeeded",
+  "payload": {
+    "capsule_id": "rev_capsule_1",
+    "exit_code": 0
+  }
+}

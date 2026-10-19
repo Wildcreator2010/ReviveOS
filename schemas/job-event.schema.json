@@ -1,0 +1,591 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reviveos.dev/schemas/job-event.schema.json",
+  "title": "Job event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "job_id",
+    "project_id",
+    "ts",
+    "type",
+    "payload"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "type": {
+      "enum": [
+        "job.queued",
+        "archaeology.started",
+        "archaeology.evidence",
+        "env.inferred",
+        "sandbox.created",
+        "build.attempt",
+        "build.failed",
+        "repair.attempt",
+        "repair.applied",
+        "test.attempt",
+        "behavior.captured",
+        "behavior.compared",
+        "score.computed",
+        "capsule.created",
+        "job.succeeded",
+        "job.failed"
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "$comment": "Shape per event type is fixed by the allOf/if-then branches below; an unknown type is rejected by the enum above."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "job.queued"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "const": "queued"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "archaeology.started"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "low_confidence_fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "archaeology.evidence"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "warnings"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source": {
+                "type": "string"
+              },
+              "low_confidence_fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "env.inferred"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "confidence"
+            ],
+            "properties": {
+              "confidence": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "sandbox.created"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "backend": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "build.attempt"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempt"
+            ],
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "ok": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "build.failed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempt",
+              "reason"
+            ],
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "reason": {
+                "type": "string"
+              },
+              "error_signature": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "repair.attempt"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempt"
+            ],
+            "properties": {
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "repair.applied"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "applied",
+              "attempt"
+            ],
+            "properties": {
+              "applied": {
+                "type": "boolean"
+              },
+              "attempt": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "test.attempt"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              },
+              "tests_absent": {
+                "type": "boolean"
+              },
+              "passed": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "behavior.captured"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cases"
+            ],
+            "properties": {
+              "cases": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "behavior.compared"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "matched"
+            ],
+            "properties": {
+              "matched": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "score.computed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "total"
+            ],
+            "properties": {
+              "total": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "alive",
+                  "partial",
+                  "dead"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "capsule.created"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "capsule_id"
+                ]
+              },
+              {
+                "required": [
+                  "capsule_ref"
+                ]
+              }
+            ],
+            "properties": {
+              "capsule_id": {
+                "type": "string"
+              },
+              "capsule_ref": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "job.succeeded"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "const": "succeeded"
+              },
+              "capsule_id": {
+                "type": "string"
+              },
+              "capsule_ref": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "job.failed"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "failed",
+                  "cancelled"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              },
+              "attempts": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_events": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

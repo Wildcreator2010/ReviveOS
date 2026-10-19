@@ -1,0 +1,15 @@
+# --- install channel: deadsnakes (apt PPA) --------------------------------
+# The only apt source added is the official deadsnakes PPA.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    {{ extra_apt | pkgjoin }} \
+ && add-apt-repository -y ppa:deadsnakes/ppa \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+    python{{ python_version }} \
+    python{{ python_version }}-dev \
+    python{{ python_version }}-venv \
+ && rm -rf /var/lib/apt/lists/*
+RUN python{{ python_version }} -m ensurepip --upgrade \
+ && python{{ python_version }} -m pip install --upgrade pip setuptools wheel
+

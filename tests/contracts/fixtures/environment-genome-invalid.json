@@ -1,0 +1,17 @@
+{
+  "python": {
+    "confidence": 1.2,
+    "evidence": []
+  },
+  "os": {
+    "confidence": 0.5,
+    "evidence": []
+  },
+  "dependencies": [],
+  "cuda": {
+    "confidence": 0,
+    "evidence": []
+  },
+  "system_libs": [],
+  "overall_confidence": 1.2
+}

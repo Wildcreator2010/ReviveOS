@@ -1,0 +1,8 @@
+# --- sandbox baseline -----------------------------------------------------
+# Runtime containers add: network_disabled, no-new-privileges, tmpfs /tmp 256m.
+RUN groupadd --gid 1000 revive \
+ && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash revive \
+ && mkdir -p /workspace && chown 1000:1000 /workspace
+USER 1000:1000
+WORKDIR /workspace
+CMD ["/bin/bash"]

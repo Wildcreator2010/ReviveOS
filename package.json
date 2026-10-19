@@ -1,0 +1,13 @@
+{
+  "name": "reviveos",
+  "private": true,
+  "packageManager": "pnpm@9.12.3",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build",
+    "build:desktop": "pnpm --filter desktop build",
+    "dist": "pnpm --filter web build && pnpm --filter desktop dist",
+    "typecheck:web": "pnpm --filter web typecheck",
+    "lint:web": "pnpm --filter web lint"
+  }
+}

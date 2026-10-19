@@ -1,0 +1,11 @@
+# --- install channel: apt -------------------------------------------------
+# Egress during build is limited to the official Ubuntu archive and pypi.org /
+# files.pythonhosted.org; no other index may be configured.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    {{ extra_apt | pkgjoin }} \
+ && rm -rf /var/lib/apt/lists/*
+RUN python{{ python_version }} -m ensurepip --upgrade \
+ && python{{ python_version }} -m pip install --upgrade pip setuptools wheel
+

@@ -1,0 +1,42 @@
+{
+  "format": "revive/behavior-fingerprint/v1",
+  "plan_ref": "tests/behavior-plan.json",
+  "captured_at": "2026-10-06T12:00:00+00:00",
+  "baseline_source": {
+    "priority": 1,
+    "kind": "repo_expected_outputs",
+    "reference": "tests/expected/out.txt"
+  },
+  "cases": [
+    {
+      "id": "help",
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "stdout_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "stderr_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "stdout_excerpt_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "output_files": [
+        {
+          "glob": "out/*.txt",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ],
+      "numeric_series": [
+        {
+          "name": "loss",
+          "values": [
+            1.5,
+            1.25
+          ],
+          "dtype": "float"
+        }
+      ],
+      "structural": {
+        "help": true
+      }
+    }
+  ]
+}

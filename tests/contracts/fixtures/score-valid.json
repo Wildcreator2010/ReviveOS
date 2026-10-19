@@ -1,0 +1,9 @@
+{
+  "runtime": 90,
+  "dependencies": 80,
+  "build": 70,
+  "tests": 60,
+  "behavior": 100,
+  "reproducibility": 50,
+  "total": 78.5
+}

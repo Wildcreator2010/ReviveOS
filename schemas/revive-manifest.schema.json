@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reviveos.dev/schemas/revive-manifest.schema.json",
+  "title": "Revive capsule manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "source",
+    "genome_ref",
+    "behavior",
+    "score",
+    "patches",
+    "sbom_digest",
+    "provenance",
+    "status"
+  ],
+  "properties": {
+    "format": {
+      "const": "revive/v1"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo",
+        "commit"
+      ],
+      "properties": {
+        "repo": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit": {
+          "type": "string",
+          "minLength": 7
+        }
+      }
+    },
+    "genome_ref": {
+      "type": "string"
+    },
+    "behavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatibility"
+      ],
+      "properties": {
+        "compatibility": {
+          "type": "string"
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "components"
+      ],
+      "properties": {
+        "total": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "components": {
+          "type": "object"
+        }
+      }
+    },
+    "patches": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sbom_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence",
+        "llm_traces"
+      ],
+      "properties": {
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "llm_traces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "alive",
+        "partial",
+        "dead"
+      ]
+    }
+  }
+}

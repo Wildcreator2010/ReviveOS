@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "required": [
+    "repo",
+    "commit_pinned",
+    "license",
+    "stars_at_pin",
+    "last_activity",
+    "death_reasons",
+    "size_mb",
+    "has_tests",
+    "has_ci",
+    "has_dockerfile",
+    "python_requires_evidence",
+    "notes"
+  ],
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "commit_pinned": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "death_reasons": {
+      "type": "array"
+    }
+  }
+}

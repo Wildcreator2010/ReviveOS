@@ -1,0 +1,4 @@
+# uv project config (workspace-scoped settings only).
+# cache-dir / python-install-dir are global-only settings, so they are injected by
+# tools/dev_env.ps1 and by the .tools/bin/uv shim instead of this file.
+link-mode = "copy"

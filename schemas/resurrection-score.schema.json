@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reviveos.dev/schemas/resurrection-score.schema.json",
+  "title": "Resurrection score",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runtime",
+    "dependencies",
+    "build",
+    "tests",
+    "behavior",
+    "reproducibility",
+    "total"
+  ],
+  "x-weights": {
+    "runtime": 0.2,
+    "dependencies": 0.2,
+    "build": 0.15,
+    "tests": 0.15,
+    "behavior": 0.2,
+    "reproducibility": 0.1
+  },
+  "x-behavior-null-degradation": {
+    "rule": "renormalize_remaining_weights",
+    "comment": "When no behaviour baseline exists (behavior=null) the behaviour component is written as 0 and the total is recomputed over the remaining five components whose weights are renormalized to sum to 1.0. The score status can then never be 'alive' (see revive_core.scoring). This runtime rule is read from this annotation by the single scoring implementation; no second copy of the formula may exist in CLI/Web."
+  },
+  "properties": {
+    "runtime": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "dependencies": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "build": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "tests": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "behavior": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "reproducibility": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "total": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    }
+  }
+}

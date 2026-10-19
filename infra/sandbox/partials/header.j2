@@ -1,0 +1,11 @@
+# syntax=docker/dockerfile:1.7
+# ReviveOS historic sandbox base image.
+# GENERATED from the MATRIX table in revive_core/sandbox/image_matrix.py - do not edit by hand.
+# Channel: {{ channel }} | Python {{ python_version }} | {{ note }}
+FROM {{ os_reference }}
+
+ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 \
+    PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1 \
+    PIP_INDEX_URL={{ pip_index_url | urlv }} PIP_TRUSTED_HOST=pypi.org
+LABEL revive.managed="true" revive.python="{{ python_version }}" revive.channel="{{ channel }}"
+

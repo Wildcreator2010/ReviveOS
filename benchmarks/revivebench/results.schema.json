@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "required": [
+    "run_id",
+    "ts",
+    "repo",
+    "arm",
+    "outcome",
+    "metrics",
+    "environment_fingerprint",
+    "artifacts_ref",
+    "failures"
+  ],
+  "properties": {
+    "arm": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    "failures": {
+      "type": "array"
+    }
+  }
+}

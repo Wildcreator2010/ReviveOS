@@ -1,0 +1,89 @@
+# ReviveOS CI quality gate (T-INIT-03).
+#
+# Order is contractual: ruff -> mypy -> pytest (unit) -> jsonschema contracts ->
+# global rules. This workflow only ever verifies the tree; shipping/rollout
+# belongs to the T-PRD stack, so no release or rollout action appears here.
+# Global rule §6.6: never bypass this gate.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: quality gate (ruff -> mypy -> pytest -> contracts -> global rules)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: sync uv workspace (locked)
+        run: uv sync --all-packages --frozen
+
+      # Scope is the whole Python surface, stated explicitly: `ruff format .`
+      # walks non-Python root entries that ruff cannot map to a source file.
+      - name: ruff lint
+        run: >-
+          uv run ruff check
+          packages/core/src cli/src agents/src apps/api/src tests tools revivebench
+
+      - name: ruff format check
+        run: >-
+          uv run ruff format --check
+          packages/core/src cli/src agents/src apps/api/src tests tools revivebench
+
+      - name: mypy (packages/core cli agents apps/api)
+        run: uv run mypy packages/core/src cli/src agents/src apps/api/src
+
+      - name: pytest (unit layer)
+        run: uv run pytest -q tests -m "not requires_docker"
+
+      - name: jsonschema contracts
+        run: |
+          uv run python tools/check_contracts.py
+          if find tests/contracts -name 'test_*.py' -print -quit | grep -q .; then
+            uv run pytest -q tests/contracts
+          fi
+
+      - name: global rules (secrets / repair limits / permissions)
+        run: uv run python tools/check_global_rules.py .
+
+      # The console is part of the product; its types come from the OpenAPI snapshot,
+      # so a stale snapshot or a hand-edited client must fail here too.
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+
+      - name: web install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: web typecheck
+        run: pnpm --filter web typecheck
+
+      - name: web lint
+        run: pnpm --filter web lint
+
+      - name: web production build
+        run: pnpm --filter web build
+        env:
+          NEXT_PUBLIC_REVIVE_API_URL: "/"

@@ -1,0 +1,54 @@
+# ReviveOS pre-commit gate (T-INIT-03).
+#
+# Every hook is repo-local + `language: system` on purpose: the DSH sandbox
+# cannot reach registry.npmjs.org or pre-commit's hook-vendor hosts, so cloning
+# hook environments would hang. The hooks therefore run the tools already pinned
+# in .venv / uv.lock -- exactly the same commands CI runs.
+#
+# Run it with the workspace interpreter, e.g.
+#   .venv\Scripts\python.exe -m pre_commit run --all-files
+#   make pre-commit
+#
+# Global rule §6.6/§6.8: no hook may be skipped and no `--no-verify` escape is
+# provided anywhere in this file.
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff lint
+        entry: python -m ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format --check
+        entry: python -m ruff format --check --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy (core / cli / agents / api)
+        entry: python -m mypy packages/core/src cli/src agents/src apps/api/src
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: pytest-unit
+        name: pytest (unit layer)
+        entry: python -m pytest -q tests -m "not requires_docker"
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: jsonschema-contracts
+        name: jsonschema contracts
+        entry: python tools/check_contracts.py
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: global-rules
+        name: global rules (secrets / repair limits / permissions)
+        entry: python tools/check_global_rules.py .
+        language: system
+        pass_filenames: false
+        always_run: true
