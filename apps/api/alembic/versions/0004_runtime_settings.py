@@ -1,4 +1,5 @@
 """shared runtime settings such as maintenance mode"""
+
 from __future__ import annotations
 
 import sqlalchemy as sa

@@ -18,10 +18,11 @@ UV ?= uv
 PNPM ?= node .tools/pnpm/node_modules/pnpm/bin/pnpm.cjs
 
 SRC_PATHS := packages/core/src cli/src agents/src apps/api/src
+LINT_PATHS := $(SRC_PATHS) apps/api/alembic
 # Every directory that holds Python. Kept explicit instead of "." because
 # `ruff format .` panics on this workspace's root walk (stray/scratch entries);
 # the scope below is the whole Python surface and is deterministic.
-PY_PATHS := $(SRC_PATHS) tests tools revivebench
+PY_PATHS := $(LINT_PATHS) tests tools revivebench
 COMPOSE := docker compose -f infra/compose/dev.docker-compose.yml
 
 PRE_COMMIT_HOME ?= .pre-commit-cache

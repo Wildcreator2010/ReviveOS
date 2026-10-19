@@ -39,12 +39,12 @@ jobs:
       - name: ruff lint
         run: >-
           uv run ruff check
-          packages/core/src cli/src agents/src apps/api/src tests tools revivebench
+          packages/core/src cli/src agents/src apps/api/src apps/api/alembic tests tools revivebench
 
       - name: ruff format check
         run: >-
           uv run ruff format --check
-          packages/core/src cli/src agents/src apps/api/src tests tools revivebench
+          packages/core/src cli/src agents/src apps/api/src apps/api/alembic tests tools revivebench
 
       - name: mypy (packages/core cli agents apps/api)
         run: uv run mypy packages/core/src cli/src agents/src apps/api/src
