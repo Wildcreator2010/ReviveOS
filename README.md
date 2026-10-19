@@ -108,6 +108,11 @@ docker compose -f infra/compose/dev.docker-compose.yml up -d   # 需在沙箱外
 
 详见 [docs/dev-environment.md](docs/dev-environment.md)。
 
+## 三·五、交付状态
+
+**[DELIVERY.md](DELIVERY.md)** 是本仓库的交付收口证据表：已验证门禁、待沙箱外验证项（含精确命令）、
+上线前人工清单、以及已知限制。阅读顺序建议：本文件 → DELIVERY → [生产就绪](docs/production-readiness.md)。
+
 ## 四、设计原则（不得违反）
 
 - **Evidence First, AI Second**：考古引擎不调用任何 LLM 也能产出环境基因；LLM 只做补强，且幻觉证据必须被拦截。
