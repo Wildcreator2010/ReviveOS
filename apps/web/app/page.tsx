@@ -156,8 +156,8 @@ export default function HomePage() {
       <section className="panel">
         <h2>数据来源声明</h2>
         <p className="muted small">
-          本控制台只渲染 API 返回值。OpenAPI 快照（schemas/openapi/openapi.json）尚未由后端发布，因此
-          apps/web/src/api/types.gen.ts 中的领域类型仍是占位：页面通过 src/api/readers.ts 的运行时读取器取值，缺失字段显示为「未知 / API 未提供」，绝不填充示例数据。
+          本控制台只渲染 API 返回值。OpenAPI 快照（schemas/openapi/openapi.json）由后端路由生成，
+          apps/web/src/api/types.gen.ts 与快照同步；页面通过 src/api/readers.ts 做运行时校验，缺失字段显示为「未知 / API 未提供」，绝不填充示例数据。
         </p>
       </section>
     </div>

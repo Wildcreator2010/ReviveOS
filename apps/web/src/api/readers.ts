@@ -217,7 +217,9 @@ const GENOME_FIELDS: readonly { key: string; label: string }[] = [
 ];
 
 export function readGenome(value: unknown): GenomeView | null {
-  const raw = asRecord(value);
+  const container = asRecord(value);
+  const payload = container && "genome" in container ? container.genome : value;
+  const raw = asRecord(payload);
   if (!raw) return null;
   const fields: GenomeField[] = [];
   for (const { key, label } of GENOME_FIELDS) {
@@ -275,7 +277,9 @@ export const SCORE_WEIGHTS: Record<string, number> = {
 };
 
 export function readScore(value: unknown): ScoreView | null {
-  const raw = asRecord(value);
+  const container = asRecord(value);
+  const payload = container && "score" in container ? container.score : value;
+  const raw = asRecord(payload);
   if (!raw) return null;
   const components = SCORE_COMPONENTS.map(({ key, label }) => ({
     key,
@@ -312,7 +316,9 @@ export function readPatches(value: unknown): PatchView[] {
 }
 
 export function readBehavior(value: unknown): BehaviorView | null {
-  const raw = asRecord(value);
+  const container = asRecord(value);
+  const payload = container && "behavior" in container ? container.behavior : value;
+  const raw = asRecord(payload);
   if (!raw) return null;
   const compatibility = num(raw.compatibility) ?? num(pick(raw, "summary.compatibility"));
   const cases = itemsOf(raw.cases)
@@ -356,16 +362,17 @@ export function readCapsule(value: unknown): CapsuleView | null {
   if (!raw) return null;
   const id = str(raw.id) ?? str(raw.capsule_id);
   if (!id) return null;
-  const status = str(raw.status);
+  const manifest = asRecord(raw.manifest) ?? {};
+  const status = str(manifest.status) ?? str(raw.status);
   return {
     id,
     status: status === "alive" || status === "partial" || status === "dead" ? status : "unknown",
-    format: str(raw.format),
-    repo: pickStr(raw, "source.repo"),
-    commit: pickStr(raw, "source.commit"),
-    scoreTotal: pickNum(raw, "score.total"),
-    patchCount: Array.isArray(pick(raw, "patches")) ? (pick(raw, "patches") as unknown[]).length : null,
-    sbomDigest: str(raw.sbom_digest),
+    format: str(manifest.format) ?? str(raw.format),
+    repo: pickStr(manifest, "source.repo") ?? pickStr(raw, "source.repo"),
+    commit: pickStr(manifest, "source.commit") ?? pickStr(raw, "source.commit"),
+    scoreTotal: pickNum(manifest, "score.total") ?? pickNum(raw, "score.total"),
+    patchCount: Array.isArray(pick(manifest, "patches")) ? (pick(manifest, "patches") as unknown[]).length : null,
+    sbomDigest: str(manifest.sbom_digest) ?? str(raw.sbom_digest),
     createdAt: timestamp(raw.created_at),
     downloadUrl: str(raw.download_url),
     raw,

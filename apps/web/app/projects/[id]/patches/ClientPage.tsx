@@ -1,7 +1,6 @@
 "use client";
 
 
-import { useParams } from "next/navigation";
 import { useApiQuery } from "../../../../src/api/useApi";
 import { describeApiError } from "../../../../src/api/useApi";
 import { readPatches } from "../../../../src/api/readers";
@@ -9,10 +8,10 @@ import { AsyncSection } from "../../../../components/ui/StateView";
 import { ProjectTabs } from "../../../../src/features/projects/ProjectTabs";
 import { PatchCard } from "../../../../components/ui/Cards";
 import { DiffView } from "../../../../components/ui/DiffView";
+import { useRouteId } from "../../../../src/api/routeParams";
 
 export default function PatchesPage() {
-  const params = useParams<{ id: string }>();
-  const projectId = typeof params.id === "string" ? params.id : "";
+  const projectId = useRouteId("projects");
   const query = useApiQuery(["project-patches", projectId], `/api/v1/projects/${encodeURIComponent(projectId)}/patches`, undefined, projectId.length > 0);
   const patches = query.data ? readPatches(query.data) : [];
 

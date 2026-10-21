@@ -106,6 +106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/api-keys": {
         parameters: {
             query?: never;
@@ -521,6 +538,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Llm Get */
+        get: operations["admin_llm_get_admin_llm_get"];
+        /** Admin Llm Put */
+        put: operations["admin_llm_put_admin_llm_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/llm/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin Llm Test */
+        post: operations["admin_llm_test_admin_llm_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -583,6 +635,23 @@ export interface paths {
         put?: never;
         /** Refresh V1 */
         post: operations["refresh_v1_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout V1 */
+        post: operations["logout_v1_api_v1_auth_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1004,6 +1073,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Llm Get V1 */
+        get: operations["admin_llm_get_v1_api_v1_admin_llm_get"];
+        /** Admin Llm Put V1 */
+        put: operations["admin_llm_put_v1_api_v1_admin_llm_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/llm/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin Llm Test V1 */
+        post: operations["admin_llm_test_v1_api_v1_admin_llm_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1163,6 +1267,78 @@ export interface components {
              */
             cancel_requested: boolean;
         };
+        /** LlmSettingsRequest */
+        LlmSettingsRequest: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "fake" | "openai" | "anthropic" | "custom";
+            /**
+             * Base Url
+             * @default
+             */
+            base_url: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /** Api Key */
+            api_key?: string | null;
+            /**
+             * Clear Api Key
+             * @default false
+             */
+            clear_api_key: boolean;
+            /** Reasoning Effort */
+            reasoning_effort?: ("low" | "medium" | "high") | null;
+        };
+        /** LlmSettingsResponse */
+        LlmSettingsResponse: {
+            /** Provider */
+            provider: string;
+            /**
+             * Base Url
+             * @default
+             */
+            base_url: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /** Reasoning Effort */
+            reasoning_effort?: string | null;
+            /**
+             * Api Key Set
+             * @default false
+             */
+            api_key_set: boolean;
+            /** Api Key Hint */
+            api_key_hint?: string | null;
+            /**
+             * Source
+             * @default runtime
+             */
+            source: string;
+        };
+        /** LlmTestResponse */
+        LlmTestResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Provider */
+            provider: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /** Latency Ms */
+            latency_ms?: number | null;
+            /** Detail */
+            detail?: string | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Email */
@@ -1253,6 +1429,13 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** ResurrectRequest */
+        ResurrectRequest: {
+            /** Budget Usd */
+            budget_usd?: number | null;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
         };
         /** ResurrectResponse */
         ResurrectResponse: {
@@ -1447,6 +1630,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1710,7 +1924,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ResurrectRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {
@@ -2444,6 +2662,79 @@ export interface operations {
             };
         };
     };
+    admin_llm_get_admin_llm_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsResponse"];
+                };
+            };
+        };
+    };
+    admin_llm_put_admin_llm_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_llm_test_admin_llm_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmTestResponse"];
+                };
+            };
+        };
+    };
     me_v1_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -2551,6 +2842,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_v1_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -2814,7 +3136,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ResurrectRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {
@@ -3544,6 +3870,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_llm_get_v1_api_v1_admin_llm_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsResponse"];
+                };
+            };
+        };
+    };
+    admin_llm_put_v1_api_v1_admin_llm_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_llm_test_v1_api_v1_admin_llm_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmTestResponse"];
                 };
             };
         };

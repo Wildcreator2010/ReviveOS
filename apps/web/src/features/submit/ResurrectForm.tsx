@@ -11,13 +11,12 @@ const GITHUB_RE = /^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\/?$/
 type Options = {
   budgetUsd: string;
   timeoutMinutes: string;
-  allowOffline: boolean;
 };
 
 export function ResurrectForm() {
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
-  const [options, setOptions] = useState<Options>({ budgetUsd: "5", timeoutMinutes: "60", allowOffline: true });
+  const [options, setOptions] = useState<Options>({ budgetUsd: "5", timeoutMinutes: "60" });
   const [submitting, setSubmitting] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -65,7 +64,6 @@ export function ResurrectForm() {
     const job = await apiPost<unknown>(`/api/v1/projects/${encodeURIComponent(projectId)}/resurrect`, {
       budget_usd: Number(options.budgetUsd),
       timeout_seconds: Number(options.timeoutMinutes) * 60,
-      allow_offline_analysis: options.allowOffline,
     });
     const jobId = pickStr(job, "job_id") ?? pickStr(job, "id") ?? str((job as { job?: { id?: string } } | null)?.job?.id);
     if (!jobId) throw new ApiError(500, "internal", { message: "resurrect 未返回 job_id。" });
@@ -110,7 +108,7 @@ export function ResurrectForm() {
           </p>
         ) : null}
 
-        <div className="grid-3">
+        <div className="grid-2">
           <label className="field">
             预算上限（USD）
             <input type="number" min="0" step="1" value={options.budgetUsd} onChange={(event) => setOptions({ ...options, budgetUsd: event.target.value })} disabled={submitting} />
@@ -118,10 +116,6 @@ export function ResurrectForm() {
           <label className="field">
             超时（分钟）
             <input type="number" min="1" step="1" value={options.timeoutMinutes} onChange={(event) => setOptions({ ...options, timeoutMinutes: event.target.value })} disabled={submitting} />
-          </label>
-          <label className="check" style={{ alignSelf: "end", paddingBottom: 8 }}>
-            <input type="checkbox" checked={options.allowOffline} onChange={(event) => setOptions({ ...options, allowOffline: event.target.checked })} disabled={submitting} />
-            允许离线分析
           </label>
         </div>
 

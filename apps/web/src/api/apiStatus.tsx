@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiBaseUrl, apiGet } from "../api/client";
+import { itemsOf } from "./domain";
 import { API_PATHS } from "./paths";
 import { readJob } from "./readers";
 
@@ -77,6 +78,6 @@ export function RecentJobsProbe() {
   });
   if (query.isLoading) return <p className="muted small">正在读取任务…</p>;
   if (query.isError) return null;
-  const jobs = Array.isArray(query.data) ? query.data : [];
+  const jobs = itemsOf(query.data);
   return <p className="muted small">最近 {jobs.map((job) => readJob(job)?.id ?? "?").join("、") || "无任务"}</p>;
 }

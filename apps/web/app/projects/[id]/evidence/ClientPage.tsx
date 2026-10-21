@@ -2,7 +2,6 @@
 
 
 import { useState } from "react";
-import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../../../src/api/client";
 import { asRecord, itemsOf, num, str } from "../../../../src/api/domain";
@@ -10,12 +9,12 @@ import { describeApiError } from "../../../../src/api/useApi";
 import { AsyncSection } from "../../../../components/ui/StateView";
 import { ProjectTabs } from "../../../../src/features/projects/ProjectTabs";
 import { toneForConfidence } from "../../../../components/ui/MetricMeter";
+import { useRouteId } from "../../../../src/api/routeParams";
 
 const SOURCE_KINDS = ["git_history", "manifest_file", "ci_config", "doc", "release_artifact", "inference"] as const;
 
 export default function EvidencePage() {
-  const params = useParams<{ id: string }>();
-  const projectId = typeof params.id === "string" ? params.id : "";
+  const projectId = useRouteId("projects");
   const [sourceKind, setSourceKind] = useState<string>("");
   const query = useQuery({
     queryKey: ["project-evidence", projectId, sourceKind],

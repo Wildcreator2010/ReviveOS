@@ -43,10 +43,12 @@ export function useJobEvents(jobId: string): JobEventsState {
   const [epoch, setEpoch] = useState(0);
   const seen = useRef<Set<string>>(new Set());
   const streamRef = useRef<JobEventStream | null>(null);
+  const lastEventIdRef = useRef<string | null>(null);
 
   const push = useCallback((incoming: JobEvent) => {
     if (seen.current.has(incoming.id)) return; // idempotent replay
     seen.current.add(incoming.id);
+    lastEventIdRef.current = incoming.id;
     setTotalEvents((count) => count + 1);
     setLastEventId(incoming.id);
     setEvents((current) => {
@@ -62,6 +64,7 @@ export function useJobEvents(jobId: string): JobEventsState {
   useEffect(() => {
     if (!jobId) return;
     seen.current = new Set();
+    lastEventIdRef.current = null;
     setEvents([]);
     setTerminal(null);
     setTotalEvents(0);
@@ -103,14 +106,29 @@ export function useJobEvents(jobId: string): JobEventsState {
     let cancelled = false;
     const tick = async () => {
       try {
-        const payload = await apiGet<unknown>(API_PATHS.job(jobId));
+        const payload = await apiGet<unknown>(API_PATHS.jobEvents(jobId), {
+          query: { after: lastEventIdRef.current ?? undefined },
+        });
         if (cancelled) return;
-        const job = readJob(payload);
-        if (job) setJobStatus(job.status);
-        const recent = Array.isArray((payload as { events?: unknown[] }).events) ? (payload as { events: unknown[] }).events : [];
+        const recent = Array.isArray(payload) ? payload : [];
         for (const entry of recent) {
           const event = readEvent(entry);
-          if (event) push(event);
+          if (!event) continue;
+          push(event);
+          if (isTerminal(event.type)) {
+            setTerminal(event);
+            setJobStatus(event.type === "job.succeeded" ? "succeeded" : "failed");
+          }
+        }
+        if (Array.isArray(payload) && payload.length > 0) return;
+        // Keep the JobResponse in sync even when there are no new events yet.
+        const jobPayload = await apiGet<unknown>(API_PATHS.job(jobId));
+        if (cancelled) return;
+        const job = readJob(jobPayload);
+        if (!job) return;
+        setJobStatus(job.status);
+        if (job.status === "succeeded" || job.status === "failed" || job.status === "cancelled") {
+          setDetail((current) => current ?? `任务已${job.status === "succeeded" ? "成功" : "结束"}，事件流已降级为轮询`);
         }
       } catch {
         /* polling failure keeps the degraded banner visible */

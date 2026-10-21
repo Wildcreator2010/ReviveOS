@@ -2,7 +2,9 @@
 
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useState } from "react";
+import { apiUrl, getAccessToken } from "../../../src/api/client";
+import { useRouteId } from "../../../src/api/routeParams";
 import { useApiQuery } from "../../../src/api/useApi";
 import { readCapsule } from "../../../src/api/readers";
 import { asRecord, pickArray, pickStr, str } from "../../../src/api/domain";
@@ -10,14 +12,43 @@ import { AsyncSection } from "../../../components/ui/StateView";
 import { CapsuleStatusBadge, Tile, formatTimestamp } from "../../../components/ui/Cards";
 
 export default function CapsuleDetailPage() {
-  const params = useParams<{ id: string }>();
-  const capsuleId = typeof params.id === "string" ? params.id : "";
+  const capsuleId = useRouteId("capsules");
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const query = useApiQuery(["capsule", capsuleId], `/api/v1/capsules/${encodeURIComponent(capsuleId)}`, undefined, capsuleId.length > 0);
   const capsule = query.data ? readCapsule(query.data) : null;
-  const provenance = query.data ? asRecord(asRecord(query.data)?.provenance) : null;
+  const manifest = query.data ? asRecord(asRecord(query.data)?.manifest) : null;
+  const provenance = manifest ? asRecord(manifest.provenance) : null;
   const evidenceRefs = provenance ? pickArray(provenance, "evidence") : [];
   const llmTraces = provenance ? pickArray(provenance, "llm_traces") : [];
-  const patches = query.data ? pickArray(query.data, "patches") : [];
+  const patches = manifest ? pickArray(manifest, "patches") : [];
+
+  async function download() {
+    if (downloading || !capsuleId) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const token = getAccessToken();
+      const response = await fetch(apiUrl(`/api/v1/capsules/${encodeURIComponent(capsuleId)}/download`), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(`下载失败（${response.status}）`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = `${capsuleId}.revive`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div className="stack">
@@ -47,11 +78,16 @@ export default function CapsuleDetailPage() {
         </AsyncSection>
 
         <div className="row" style={{ marginTop: 12 }}>
-          <a className="btn btn-primary" href={`/api/v1/capsules/${encodeURIComponent(capsuleId)}/download`}>
-            下载 .revive
-          </a>
+          <button type="button" className="btn btn-primary" onClick={() => void download()} disabled={downloading}>
+            {downloading ? "正在下载…" : "下载 .revive"}
+          </button>
           <span className="muted small">下载走 API 的 presigned 302；前端不拼接签名 URL。</span>
         </div>
+        {downloadError ? (
+          <p className="muted small" role="alert">
+            {downloadError}
+          </p>
+        ) : null}
       </section>
 
       <section className="panel">

@@ -85,15 +85,30 @@ function handle(base: string, request: IncomingMessage, response: ServerResponse
 function candidatePaths(base: string, safePath: string): string[] {
   const joined = join(base, safePath);
   const candidates: string[] = [];
-  if (safePath.endsWith("/")) {
+  // Windows normalize() returns backslashes; URL routing must still see segments.
+  const urlPath = safePath.replace(/\\/g, "/");
+  const segments = urlPath.split("/").filter((segment) => segment.length > 0);
+  // Dynamic routes are exported once under <route>/__runtime__/; map a concrete
+  // id (and optional sub-route) onto that shell before trying SPA fallbacks.
+  const [first, second] = segments;
+  if (first && second && ["jobs", "projects", "capsules"].includes(first) && second !== "__runtime__") {
+    const runtime = join(base, first, "__runtime__", ...segments.slice(2));
+    candidates.push(runtime);
+    candidates.push(`${runtime}.html`);
+    candidates.push(join(runtime, "index.html"));
+  }
+  if (urlPath.endsWith("/")) {
     candidates.push(join(joined, "index.html"));
   } else {
     candidates.push(joined);
     candidates.push(`${joined}.html`);
     candidates.push(join(joined, "index.html"));
   }
-  // Client-side dynamic routes (/jobs/<id>) are not prerendered: fall back to the
-  // exported 404 page, which is a real Next.js page and renders the app shell.
+  // Any remaining client-side route gets the app shell; assets keep their real
+  // extension and fall through to the 404 page instead.
+  if (!extname(urlPath)) {
+    candidates.push(join(base, "index.html"));
+  }
   candidates.push(join(base, "404.html"));
   return candidates;
 }

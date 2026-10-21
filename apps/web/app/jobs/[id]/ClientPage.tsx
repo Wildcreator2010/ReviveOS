@@ -2,7 +2,7 @@
 
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useRouteId } from "../../../src/api/routeParams";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiGet, apiPost } from "../../../src/api/client";
 import { readJob } from "../../../src/api/readers";
@@ -25,8 +25,7 @@ const STREAM_LABELS: Record<string, string> = {
 };
 
 export default function JobLivePage() {
-  const params = useParams<{ id: string }>();
-  const jobId = typeof params.id === "string" ? params.id : "";
+  const jobId = useRouteId("jobs");
   const queryClient = useQueryClient();
   const stream = useJobEvents(jobId);
   // Desktop only; a no-op in the browser. Fires exclusively on real SSE events.

@@ -27,9 +27,16 @@ export class ApiError extends Error {
 export const ERROR_MESSAGES: Record<string, string> = {
   repo_url_not_allowed: "只接受 github.com 公开仓库地址（https://github.com/owner/repo）。",
   repo_not_found: "仓库不存在或不可访问，请确认地址与可见性。",
+  repo_too_large: "仓库超过当前部署的大小上限。",
   project_exists: "项目已存在，直接新建任务或查看历史即可。",
   quota_exceeded: "配额已用尽，请稍后重试。",
   rate_limited: "请求过于频繁，请按倒计时后重试。",
+  login_rate_limited: "登录尝试过多，请稍后再试。",
+  invalid_credentials: "邮箱或密码不正确。",
+  email_in_use: "该邮箱已经注册。",
+  invalid_refresh_token: "登录已失效，请重新登录。",
+  refresh_reuse_detected: "登录会话已失效，请重新登录。",
+  llm_settings_invalid: "模型配置不完整，请检查提供方、模型和密钥。",
   maintenance: "控制面暂停接单，请稍后再试。",
   forbidden: "当前账号没有访问该资源的权限。",
   unauthorized: "登录状态已失效，请重新登录。",
@@ -49,10 +56,76 @@ export interface RequestOptions {
   token?: string | null;
   /** API key channel (X-Revive-Key) used by the CLI/CI and the desktop settings page. */
   apiKey?: string | null;
+  /** Login/refresh must not trigger the automatic refresh-retry loop. */
+  skipRefresh?: boolean;
+}
+
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+  token_type?: string;
+  expires_in?: number;
 }
 
 const DEFAULT_BASE_URL = "/";
+const ACCESS_TOKEN_KEY = "revive.access_token";
+const REFRESH_TOKEN_KEY = "revive.refresh_token";
 let baseUrlOverride: string | null = null;
+
+function storageGet(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key: string, value: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (value === null || value.length === 0) window.sessionStorage.removeItem(key);
+    else window.sessionStorage.setItem(key, value);
+  } catch {
+    /* private mode: the in-memory copy still works for this page */
+  }
+}
+
+let accessToken: string | null = storageGet(ACCESS_TOKEN_KEY);
+let refreshToken: string | null = storageGet(REFRESH_TOKEN_KEY);
+
+export function setSession(access: string, refresh: string): void {
+  accessToken = access.length > 0 ? access : null;
+  refreshToken = refresh.length > 0 ? refresh : null;
+  storageSet(ACCESS_TOKEN_KEY, accessToken);
+  storageSet(REFRESH_TOKEN_KEY, refreshToken);
+  notifySession();
+}
+
+export function clearSession(): void {
+  accessToken = null;
+  refreshToken = null;
+  storageSet(ACCESS_TOKEN_KEY, null);
+  storageSet(REFRESH_TOKEN_KEY, null);
+  notifySession();
+}
+
+function notifySession(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("revive-session"));
+}
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+export function getRefreshToken(): string | null {
+  return refreshToken;
+}
+
+export function hasSession(): boolean {
+  return Boolean(accessToken || refreshToken);
+}
 
 export function apiBaseUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_REVIVE_API_URL;
@@ -91,31 +164,81 @@ export function apiUrl(path: string, query?: RequestOptions["query"]): string {
   return `${absolute}${buildQuery(query)}`;
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
+/** Rotate the refresh token and keep the in-memory/session copy in sync. */
+export async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = refreshOnce().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+async function refreshOnce(): Promise<boolean> {
+  if (!refreshToken) return false;
+  try {
+    const response = await fetch(apiUrl("/api/v1/auth/refresh"), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!response.ok) {
+      clearSession();
+      return false;
+    }
+    const pair = (await response.json()) as TokenPair;
+    if (!pair.access_token || !pair.refresh_token) {
+      clearSession();
+      return false;
+    }
+    setSession(pair.access_token, pair.refresh_token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Thin fetch wrapper. Business code must never call fetch() with a raw
  * "/api/v1/..." string; it goes through here (T-FE-02).
  */
 export async function request<T>(path: ApiPath | string, options: RequestOptions = {}): Promise<T> {
   const url = apiUrl(path, options.query);
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    ...(options.headers ?? {}),
-  };
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
-  if (options.token) headers.Authorization = `Bearer ${options.token}`;
-  if (options.apiKey) headers["X-Revive-Key"] = options.apiKey;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: options.method ?? "GET",
-      credentials: "include",
-      headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
-    });
-  } catch (cause) {
-    throw new ApiError(0, "network_unreachable", { cause: String(cause), url });
+  const send = async (): Promise<Response> => {
+    const token = options.token ?? accessToken;
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      ...(options.headers ?? {}),
+    };
+    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (options.apiKey) headers["X-Revive-Key"] = options.apiKey;
+    try {
+      return await fetch(url, {
+        method: options.method ?? "GET",
+        credentials: "include",
+        headers,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: options.signal,
+      });
+    } catch (cause) {
+      throw new ApiError(0, "network_unreachable", { cause: String(cause), url });
+    }
+  };
+
+  let response = await send();
+  if (
+    response.status === 401 &&
+    !options.skipRefresh &&
+    !options.apiKey &&
+    !options.token &&
+    refreshToken &&
+    (await refreshAccessToken())
+  ) {
+    response = await send();
   }
 
   if (!response.ok) {

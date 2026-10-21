@@ -1,4 +1,4 @@
-import { apiUrl } from "./client";
+import { apiUrl, getAccessToken, refreshAccessToken } from "./client";
 import { API_PATHS } from "./paths";
 import { readEvent } from "./readers";
 import type { JobEvent } from "./domain-types";
@@ -44,6 +44,7 @@ export class JobEventStream {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
   private lastEventId: string | null = null;
+  private authRetried = false;
   private readonly options: Required<Omit<StreamOptions, "onExhausted">> & Pick<StreamOptions, "onExhausted">;
 
   constructor(
@@ -81,9 +82,9 @@ export class JobEventStream {
     if (this.closed) return;
     this.controller = new AbortController();
     this.callbacks.onStatus(this.attempt === 0 ? "connecting" : "reconnecting");
-    // Auth rides on the httpOnly refresh cookie (credentials: include); the console
-    // never persists an access token in web storage.
     const headers: Record<string, string> = { Accept: "text/event-stream" };
+    const token = getAccessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
     if (this.lastEventId) headers["Last-Event-ID"] = this.lastEventId;
     try {
       const response = await fetch(apiUrl(API_PATHS.jobEventsStream(this.jobId)), {
@@ -91,6 +92,13 @@ export class JobEventStream {
         credentials: "include",
         signal: this.controller.signal,
       });
+      if (response.status === 401 && !this.authRetried) {
+        this.authRetried = true;
+        if (await refreshAccessToken()) {
+          await this.connect();
+          return;
+        }
+      }
       if (response.status === 404 || response.status === 410) {
         this.closed = true;
         this.callbacks.onStatus("fatal", `事件流不可用（${response.status}）`);
@@ -100,6 +108,7 @@ export class JobEventStream {
         throw new Error(`stream_status_${response.status}`);
       }
       this.attempt = 0;
+      this.authRetried = false;
       this.callbacks.onStatus("open");
       await this.consume(response.body);
       // Server closed the stream deliberately (terminal event or heartbeat end).
@@ -137,16 +146,19 @@ export class JobEventStream {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    // sse-starlette separates frames with CRLF; browsers accept both. Never
+    // assume a bare "\n\n" or every frame is silently dropped.
+    const boundary = /\r?\n\r?\n/;
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      let boundary = buffer.indexOf("\n\n");
-      while (boundary >= 0) {
-        const chunk = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
+      let match = boundary.exec(buffer);
+      while (match) {
+        const chunk = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
         this.handleFrame(chunk);
-        boundary = buffer.indexOf("\n\n");
+        match = boundary.exec(buffer);
       }
     }
   }

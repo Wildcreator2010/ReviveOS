@@ -9,6 +9,8 @@ import { describeApiError } from "../../src/api/useApi";
 import { AsyncSection, OfflineState } from "../../components/ui/StateView";
 import { Tile, formatTimestamp } from "../../components/ui/Cards";
 import { desktopBridge, useDesktopSettings } from "../../src/desktop/bridge";
+import { AppearanceSection } from "../../src/features/settings/AppearanceSection";
+import { ModelProviderSection } from "../../src/features/settings/ModelProviderSection";
 
 function ApiEndpointField() {
   const desktop = useDesktopSettings();
@@ -200,12 +202,16 @@ export default function SettingsPage() {
         <ApiKeysSection />
       </section>
 
+      <AppearanceSection />
+      <ModelProviderSection />
+
       <section className="panel">
         <h2>安全说明</h2>
         <ul className="muted small">
-          <li>access token 只保存在内存；refresh token 由后端下发 httpOnly cookie，前端不写入 localStorage。</li>
+          <li>访问令牌与刷新令牌保存在当前标签页的 sessionStorage，关闭标签页即失效；不会写入 URL 或服务端日志。</li>
           <li>API Key 明文只在创建响应中出现一次，列表只显示前缀。</li>
-          <li>控制台不持久化任何密钥到文件或 URL query。</li>
+          <li>模型提供方密钥只写入服务端 runtime_settings，接口只回显末四位；数据库访问权限等同系统管理员。</li>
+          <li>壁纸只保存在当前浏览器本地，不上传服务端。</li>
         </ul>
       </section>
     </div>

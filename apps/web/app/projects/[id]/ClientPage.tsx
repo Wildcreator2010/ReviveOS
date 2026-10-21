@@ -2,7 +2,7 @@
 
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useRouteId } from "../../../src/api/routeParams";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../../src/api/client";
 import { readJobs, readProject } from "../../../src/api/readers";
@@ -12,8 +12,7 @@ import { JobRow, Tile, formatTimestamp } from "../../../components/ui/Cards";
 import { ProjectTabs } from "../../../src/features/projects/ProjectTabs";
 
 export default function ProjectDetailPage() {
-  const params = useParams<{ id: string }>();
-  const projectId = typeof params.id === "string" ? params.id : "";
+  const projectId = useRouteId("projects");
 
   const project = useQuery({
     queryKey: ["project", projectId],

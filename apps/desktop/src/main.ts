@@ -114,9 +114,22 @@ function createWindow(): void {
     }
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    if (url.startsWith("https://")) void shell.openExternal(url);
     return { action: "deny" };
   });
+  const appOrigin = new URL(webUrl).origin;
+  const guardNavigation = (event: { preventDefault: () => void }, url: string) => {
+    try {
+      if (new URL(url).origin !== appOrigin) {
+        event.preventDefault();
+        if (url.startsWith("https://")) void shell.openExternal(url);
+      }
+    } catch {
+      event.preventDefault();
+    }
+  };
+  window.webContents.on("will-navigate", guardNavigation);
+  window.webContents.on("will-redirect", guardNavigation);
 
   mainWindow = window;
   void window.loadURL(webUrl).catch((error) => {
@@ -205,7 +218,7 @@ function buildRuntime(): DesktopRuntime {
 }
 
 function registerIpc(): void {
-  ipcMain.handle(CHANNELS.getSettings, () => settings.all());
+  ipcMain.handle(CHANNELS.getSettings, () => ({ ...settings.all(), apiBaseUrl: currentApiBaseUrl() }));
   ipcMain.handle(CHANNELS.setApiBaseUrl, async (_event, url: unknown) => {
     if (typeof url !== "string") throw new Error("apiBaseUrl 必须是字符串");
     const next = settings.setApiBaseUrl(url);
