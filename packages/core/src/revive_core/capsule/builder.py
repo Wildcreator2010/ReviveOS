@@ -177,7 +177,9 @@ def _source_tar(source_tree: Path, timestamp: int) -> bytes:
             rel = entry.relative_to(source_tree)
             if any(part in _IGNORED_SOURCE_DIRS for part in rel.parts):
                 continue
-            if not entry.is_file():
+            # A cloned repository can contain symlinks to host paths; packaging the
+            # link target would leak files outside the workspace.
+            if entry.is_symlink() or not entry.is_file():
                 continue
             payload = entry.read_bytes()
             info = tarfile.TarInfo(str(rel.as_posix()))

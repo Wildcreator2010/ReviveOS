@@ -37,8 +37,8 @@ def _run(probe: Any) -> bool:
     return asyncio.run(run_probe(probe))
 
 
-@pytest.mark.parametrize(("status", "ready"), [(200, True), (403, True), (503, False)])
-def test_object_storage_probe_treats_any_sub_5xx_answer_as_healthy(status: int, ready: bool) -> None:
+@pytest.mark.parametrize(("status", "ready"), [(200, True), (403, True), (404, False), (503, False)])
+def test_object_storage_probe_fails_closed_on_missing_bucket(status: int, ready: bool) -> None:
     server, thread = _serve(status)
     try:
         config = Config(

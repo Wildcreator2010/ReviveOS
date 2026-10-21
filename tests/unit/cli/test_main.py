@@ -1,3 +1,9 @@
+from __future__ import annotations
+
+import os
+import stat
+from types import SimpleNamespace
+
 from revive_cli.auth import Credentials, CredentialStore
 from revive_cli.client import ReviveClient
 from revive_cli.main import _persist_client_credentials, app
@@ -49,3 +55,40 @@ def test_jobs_subcommands_have_help() -> None:
     for command in ("ls", "get"):
         result = runner.invoke(app, ["jobs", command, "--help"])
         assert result.exit_code == 0, (command, result.stdout, result.stderr)
+
+
+def test_credentials_fallback_file_is_owner_only(tmp_path) -> None:
+    store = CredentialStore(tmp_path / "credentials.json")
+    store.save(Credentials(access_token="a", refresh_token="r", server="https://api.test"))
+
+    assert store.path.is_file()
+    if os.name == "posix":
+        assert stat.S_IMODE(os.stat(store.path).st_mode) == 0o600
+
+
+def test_resurrect_server_mode_does_not_call_an_unfinished_stream_a_success(monkeypatch) -> None:
+    class FakeClient:
+        access_token = ""
+        refresh_token = ""
+
+        def submit_resurrection(self, repo_url, **options):
+            return SimpleNamespace(id="job-1")
+
+        def stream_events(self, job_id):
+            return iter(())
+
+        def get_job(self, job_id):
+            return SimpleNamespace(status="running")
+
+        def close(self) -> None:
+            return None
+
+    class FakeStore:
+        def load(self):
+            return Credentials(server="https://api.test")
+
+    monkeypatch.setattr("revive_cli.main._client", lambda server: (FakeClient(), FakeStore()))
+    result = runner.invoke(app, ["resurrect", "https://github.com/acme/demo", "--server", "https://api.test"])
+
+    assert result.exit_code == 2
+    assert "终态" in result.stdout or "终态" in result.stderr

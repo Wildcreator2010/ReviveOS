@@ -6,7 +6,9 @@ import base64
 import binascii
 import hashlib
 import hmac
+import os
 import secrets
+import time
 from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -18,6 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
+from revive_agents.llm import FakeProvider, from_config, from_settings
 from sse_starlette.sse import EventSourceResponse
 
 from .config import Config
@@ -40,6 +43,9 @@ from .schemas import (
     HealthResponse,
     JobListResponse,
     JobResponse,
+    LlmSettingsRequest,
+    LlmSettingsResponse,
+    LlmTestResponse,
     LoginRequest,
     MaintenanceRequest,
     MaintenanceResponse,
@@ -50,9 +56,11 @@ from .schemas import (
     ReadyResponse,
     RefreshRequest,
     RegisterRequest,
+    ResurrectRequest,
     ResurrectResponse,
     TokenResponse,
 )
+from .secrets import decrypt_secret, encrypt_secret
 from .security import decode_token, hash_password, issue_token, new_api_key
 from .services.capsule_storage import CapsuleStorage, MemoryCapsuleStorage, S3CapsuleStorage
 from .services.event_sink import SessionEventSink
@@ -167,6 +175,39 @@ def _repo_key(value: str) -> str:
     return parsed.path.strip("/").removesuffix(".git").lower()
 
 
+def _llm_settings_view(config: Config, stored: dict[str, Any] | None) -> LlmSettingsResponse:
+    if stored:
+        encrypted = str(stored.get("api_key_enc") or "")
+        hint = str(stored.get("api_key_hint") or "") or (
+            f"…{str(stored['api_key'])[-4:]}" if stored.get("api_key") else None
+        )
+        return LlmSettingsResponse(
+            provider=str(stored.get("provider") or "fake"),
+            base_url=str(stored.get("base_url") or ""),
+            model=str(stored.get("model") or ""),
+            reasoning_effort=str(stored["reasoning_effort"]) if stored.get("reasoning_effort") else None,
+            api_key_set=bool(encrypted or stored.get("api_key")),
+            api_key_hint=hint,
+            source="runtime",
+        )
+    key = os.getenv("REVIVE_LLM__API_KEY", "")
+    return LlmSettingsResponse(
+        provider=config.llm_provider,
+        base_url=config.llm_base_url,
+        model=config.llm_model,
+        reasoning_effort=os.getenv("REVIVE_LLM__REASONING_EFFORT") or None,
+        api_key_set=bool(key),
+        api_key_hint=f"…{key[-4:]}" if key else None,
+        source="env",
+    )
+
+
+def _llm_audit_view(value: Mapping[str, Any] | None) -> dict[str, Any]:
+    data = {key: item for key, item in (value or {}).items() if key not in {"api_key", "api_key_enc"}}
+    data["api_key_set"] = bool((value or {}).get("api_key_enc") or (value or {}).get("api_key"))
+    return data
+
+
 T = TypeVar("T")
 R = TypeVar("R", bound=Response)
 
@@ -254,12 +295,25 @@ async def _require_job(request: Request, job_id: str, user: UserRecord) -> JobRe
     return job
 
 
-async def _check_quota(request: Request, user: UserRecord, repo_size_mb: int | None = None) -> None:
+def _repo_size_mb(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float):
+        return int(value) if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+async def _check_quota(request: Request, user: UserRecord, repo_size_mb: Any = None) -> None:
     port: ControlPlanePort = request.app.state.control_plane
     config: Config = request.app.state.config
     if await port.is_maintenance():
         raise ApiError(503, "maintenance", "new jobs are temporarily disabled")
-    if repo_size_mb is not None and repo_size_mb > config.max_repo_mb:
+    size = _repo_size_mb(repo_size_mb)
+    if size is not None and size > config.max_repo_mb:
         raise ApiError(
             413, "repo_too_large", "repository exceeds the configured size limit", {"max_repo_mb": config.max_repo_mb}
         )
@@ -345,6 +399,7 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,
+        allow_origin_regex=config.cors_origin_regex or None,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -444,7 +499,10 @@ def create_app(
     @app.post("/auth/register", response_model=TokenResponse, status_code=201, tags=["auth"])
     async def register(payload: RegisterRequest, request: Request) -> TokenResponse:
         try:
-            user = await app.state.control_plane.add_user(payload.email, hash_password(payload.password))
+            from starlette.concurrency import run_in_threadpool
+
+            digest = await run_in_threadpool(hash_password, payload.password)
+            user = await app.state.control_plane.add_user(payload.email, digest)
         except ValueError as exc:
             raise ApiError(409, "email_in_use", "email is already registered") from exc
         return await _token_pair(app, user)
@@ -491,6 +549,15 @@ def create_app(
         if not user:
             raise ApiError(401, "invalid_refresh_token", "refresh token is invalid")
         return await _token_pair(app, user, record.family)
+
+    @app.post("/auth/logout", status_code=204, tags=["auth"])
+    async def logout(payload: RefreshRequest, request: Request) -> Response:
+        decoded = decode_token(payload.refresh_token, config.jwt_secret, kind="refresh")
+        if decoded:
+            family = str(decoded.get("family") or "")
+            if family:
+                await app.state.control_plane.revoke_refresh_family(family)
+        return Response(status_code=204)
 
     @app.post("/auth/api-keys", response_model=ApiKeyResponse, status_code=201, tags=["auth"])
     async def create_api_key(payload: ApiKeyCreateRequest, request: Request) -> ApiKeyResponse:
@@ -544,7 +611,9 @@ def create_app(
             )
         project = await app.state.control_plane.add_project(user.id, repo_url, repo_key)
         if payload.repo_size_mb is not None:
-            project.metadata["repo_size_mb"] = payload.repo_size_mb
+            metadata = {**project.metadata, "repo_size_mb": payload.repo_size_mb}
+            await app.state.control_plane.update_project(project.id, meta=metadata)
+            project.metadata = metadata
         return _project_response(project)
 
     @app.get("/projects/{project_id}", response_model=ProjectResponse, tags=["projects"])
@@ -561,8 +630,14 @@ def create_app(
             fields["status"] = payload.status
             project.status = payload.status
         if payload.metadata is not None:
-            project.metadata.update(payload.metadata)
-            fields["meta"] = project.metadata
+            # Quota inputs are server-managed; a client must not overwrite them
+            # through the generic metadata bag.
+            incoming = {
+                key: value for key, value in payload.metadata.items() if key not in {"repo_size_mb", "repo_key"}
+            }
+            if incoming:
+                project.metadata.update(incoming)
+                fields["meta"] = project.metadata
         if fields:
             await request.app.state.control_plane.update_project(project_id, **fields)
         return _project_response(project)
@@ -577,11 +652,24 @@ def create_app(
         return Response(status_code=204)
 
     @app.post("/projects/{project_id}/resurrect", response_model=ResurrectResponse, status_code=202, tags=["projects"])
-    async def resurrect(project_id: str, request: Request) -> ResurrectResponse:
+    async def resurrect(
+        project_id: str,
+        request: Request,
+        payload: ResurrectRequest | None = None,
+    ) -> ResurrectResponse:
         user = await _require_user(request)
         project = await _require_project(request, project_id, user)
         await _check_quota(request, user, project.metadata.get("repo_size_mb"))
-        job = await app.state.control_plane.add_job(project.id, user.id)
+        pipeline: dict[str, Any] = {}
+        if payload is not None:
+            if payload.budget_usd is not None:
+                pipeline["budget_usd"] = payload.budget_usd
+            if payload.timeout_seconds is not None:
+                pipeline["timeout_seconds"] = payload.timeout_seconds
+        metadata: dict[str, Any] = {"repo_url": project.repo_url}
+        if pipeline:
+            metadata["pipeline"] = pipeline
+        job = await app.state.control_plane.add_job(project.id, user.id, metadata)
         await app.state.control_plane.commit_current()
         await app.state.events.publish(job.id, "job.queued", {"status": "queued"})
         _dispatch_job(app, job.id)
@@ -592,7 +680,7 @@ def create_app(
         user = await _require_user(request)
         project = await _require_project(request, payload.project_id, user)
         await _check_quota(request, user, project.metadata.get("repo_size_mb"))
-        job = await app.state.control_plane.add_job(project.id, user.id)
+        job = await app.state.control_plane.add_job(project.id, user.id, {"repo_url": project.repo_url})
         await app.state.control_plane.commit_current()
         await app.state.events.publish(job.id, "job.queued", {"status": "queued"})
         _dispatch_job(app, job.id)
@@ -716,7 +804,9 @@ def create_app(
         request: Request,
         x_worker_token: str | None = Header(default=None),
     ) -> CapsuleResponse:
-        if not x_worker_token or not hmac.compare_digest(x_worker_token, config.worker_token):
+        supplied = (x_worker_token or "").encode("utf-8")
+        expected = config.worker_token.encode("utf-8")
+        if not supplied or not hmac.compare_digest(supplied, expected):
             raise ApiError(401, "unauthorized", "worker authentication required")
         job = await app.state.control_plane.get_job(job_id)
         if not job:
@@ -780,7 +870,8 @@ def create_app(
             raise ApiError(404, "not_found", "capsule not found")
         expires = int(datetime.now(UTC).timestamp()) + config.capsule_presign_seconds
         signature = hmac.new(config.jwt_secret.encode(), f"{capsule_id}:{expires}".encode(), hashlib.sha256).hexdigest()
-        location = f"/capsules/{quote(capsule_id)}/content?expires={expires}&signature={signature}"
+        # Keep the content URL under /api/v1 so the production Caddy route proxies it.
+        location = f"/api/v1/capsules/{quote(capsule_id)}/content?expires={expires}&signature={signature}"
         return RedirectResponse(url=location, status_code=302)
 
     @app.get("/capsules/{capsule_id}/content", include_in_schema=False)
@@ -861,6 +952,101 @@ def create_app(
             {"accepting_jobs": payload.accepting_jobs},
         )
         return MaintenanceResponse(accepting_jobs=payload.accepting_jobs)
+
+    @app.get("/admin/llm", response_model=LlmSettingsResponse, tags=["admin"])
+    async def admin_llm_get(request: Request) -> LlmSettingsResponse:
+        await _require_user(request, role="admin")
+        stored = await request.app.state.control_plane.get_runtime_setting("llm")
+        return _llm_settings_view(config, stored)
+
+    @app.put("/admin/llm", response_model=LlmSettingsResponse, tags=["admin"])
+    async def admin_llm_put(payload: LlmSettingsRequest, request: Request) -> LlmSettingsResponse:
+        admin = await _require_user(request, role="admin")
+        port: ControlPlanePort = request.app.state.control_plane
+        current = await port.get_runtime_setting("llm") or {}
+        provider = payload.provider
+        base_url = payload.base_url.strip()
+        model = payload.model.strip()
+        encrypted_key = str(current.get("api_key_enc") or "")
+        key_hint = str(current.get("api_key_hint") or "")
+        if current.get("api_key"):
+            # Migrate a legacy plaintext value on the next save.
+            legacy = str(current["api_key"])
+            encrypted_key = encrypt_secret(legacy)
+            key_hint = f"…{legacy[-4:]}"
+        if payload.clear_api_key:
+            encrypted_key = ""
+            key_hint = ""
+        elif payload.api_key is not None and payload.api_key.strip():
+            plain = payload.api_key.strip()
+            encrypted_key = encrypt_secret(plain)
+            key_hint = f"…{plain[-4:]}"
+
+        if base_url:
+            parsed = urlparse(base_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                raise ApiError(400, "llm_settings_invalid", "base_url must be an http(s) URL")
+        if provider != "fake":
+            if not model:
+                raise ApiError(400, "llm_settings_invalid", "model is required for this provider")
+            if provider == "custom" and not base_url:
+                raise ApiError(400, "llm_settings_invalid", "base_url is required for the custom provider")
+            if not encrypted_key:
+                raise ApiError(400, "llm_settings_invalid", "api_key is required for this provider")
+
+        settings = {
+            "provider": provider,
+            "base_url": base_url,
+            "model": model,
+            "reasoning_effort": payload.reasoning_effort,
+            "api_key_enc": encrypted_key,
+            "api_key_hint": key_hint,
+        }
+        await port.set_runtime_setting("llm", settings)
+        await port.append_audit(admin.id, "llm_settings", _llm_audit_view(current), _llm_audit_view(settings))
+        return _llm_settings_view(config, settings)
+
+    @app.post("/admin/llm/test", response_model=LlmTestResponse, tags=["admin"])
+    async def admin_llm_test(request: Request) -> LlmTestResponse:
+        await _require_user(request, role="admin")
+        stored = await request.app.state.control_plane.get_runtime_setting("llm")
+        started = time.monotonic()
+        try:
+            provider_settings = dict(stored) if stored else None
+            if provider_settings:
+                encrypted = str(provider_settings.get("api_key_enc") or "")
+                if encrypted:
+                    provider_settings["api_key"] = decrypt_secret(encrypted)
+            provider = from_settings(provider_settings) if provider_settings else from_config()
+            if isinstance(provider, FakeProvider):
+                return LlmTestResponse(
+                    ok=True,
+                    provider="fake",
+                    model="",
+                    latency_ms=0,
+                    detail="fake provider (no network call)",
+                )
+            completion = await provider.complete(
+                [{"role": "user", "content": "Reply with exactly: ok"}],
+                max_tokens=8,
+                timeout=20.0,
+            )
+            latency = int((time.monotonic() - started) * 1000)
+            return LlmTestResponse(
+                ok=True,
+                provider=str(getattr(provider, "name", type(provider).__name__)),
+                model=str(getattr(provider, "model", "") or ""),
+                latency_ms=latency,
+                detail=str(getattr(completion, "text", ""))[:120],
+            )
+        except Exception as exc:  # admin diagnostics must not fail the request shape
+            return LlmTestResponse(
+                ok=False,
+                provider=str((stored or {}).get("provider") or config.llm_provider),
+                model=str((stored or {}).get("model") or config.llm_model),
+                latency_ms=int((time.monotonic() - started) * 1000),
+                detail=f"{type(exc).__name__}: {str(exc)[:240]}",
+            )
 
     # Keep the documented /api/v1 prefix while retaining the original local dev paths.
     # FastAPI's router object is assembled after route declarations below.

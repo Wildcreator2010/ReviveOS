@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .diffapply import DiffApplyError, parse_diff
 from .executor import EventPort, PatchResult, SandboxHandle, SnapshotToken
 
 # Hard permission ceiling (global red line #7).  Kept in sync with
@@ -117,10 +118,17 @@ def validate_proposal(proposal: PatchProposal) -> str | None:
         return "empty diff"
     if not (proposal.diff.lstrip().startswith("diff --git") or proposal.diff.lstrip().startswith("--- ")):
         return "not a unified diff"
-    if len(proposal.touched_files) > MAX_FILES:
-        return f"patch touches {len(proposal.touched_files)} files (limit {MAX_FILES})"
-    if proposal.lines_added + proposal.lines_removed > MAX_LINES:
-        return f"patch changes {proposal.lines_added + proposal.lines_removed} lines (limit {MAX_LINES})"
+    try:
+        patches = parse_diff(proposal.diff)
+    except DiffApplyError as exc:
+        return f"invalid unified diff: {exc}"
+    # Never trust the proposal's self-reported counters: derive them from the diff.
+    files = {patch.path for patch in patches if patch.path}
+    lines = sum(1 for patch in patches for hunk in patch.hunks for tag, _text in hunk.lines if tag in {"+", "-"})
+    if len(files) > MAX_FILES:
+        return f"patch touches {len(files)} files (limit {MAX_FILES})"
+    if lines > MAX_LINES:
+        return f"patch changes {lines} lines (limit {MAX_LINES})"
     return None
 
 

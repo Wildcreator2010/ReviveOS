@@ -19,6 +19,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE = REPO_ROOT / "infra" / "compose" / "dev.docker-compose.yml"
+PROD_COMPOSE_FILE = REPO_ROOT / "infra" / "compose" / "prod.docker-compose.yml"
 CI_FILE = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 PRECOMMIT_FILE = REPO_ROOT / ".pre-commit-config.yaml"
 
@@ -100,6 +101,38 @@ def test_dev_compose_contract() -> None:
     assert "capsules" in dumped
     assert "artifacts" in dumped
     assert "C:\\" not in dumped and "/mnt/" not in dumped, "no host absolute paths"
+
+
+def test_prod_compose_uses_a_pgvector_capable_postgres() -> None:
+    compose = load_yaml(PROD_COMPOSE_FILE)
+    image = compose["services"]["postgres"]["image"]
+    assert image.startswith("pgvector/pgvector:pg16@sha256:"), (
+        "migration 0002 runs CREATE EXTENSION vector; stock postgres:16 cannot serve it"
+    )
+
+
+def test_prod_compose_schedules_the_sweeper_and_wires_capsule_upload() -> None:
+    compose = load_yaml(PROD_COMPOSE_FILE)
+    services = compose["services"]
+    assert "beat" in services, "without beat the orphan-sandbox schedule never fires"
+    assert "beat" in services["beat"]["command"]
+    assert services["worker"]["environment"]["REVIVE_API_URL"] == "http://api:8000"
+    assert services["worker"].get("depends_on", {}).get("api", {}).get("condition") == "service_healthy"
+
+
+def test_worker_and_sandbox_images_ship_git() -> None:
+    worker = (REPO_ROOT / "Dockerfile.worker").read_text(encoding="utf-8")
+    assert "git" in worker and "apt-get install" in worker, (
+        "the worker clones repositories and applies patches with git"
+    )
+    assert "COPY infra/sandbox" in worker, "DockerExecutionPort needs the sandbox Dockerfile templates"
+    assert "COPY schemas" in worker, "scoring/capsule validation reads schemas/ at runtime"
+    assert "WORKDIR /work" in worker, "the non-root worker needs a writable working directory"
+
+    partials = REPO_ROOT / "infra" / "sandbox" / "partials"
+    for name in ("apt.j2", "conda.j2", "deadsnakes.j2", "source.j2"):
+        text = (partials / name).read_text(encoding="utf-8")
+        assert "git" in text, f"{name} must install git for DockerExecutionPort.apply_patch"
 
 
 def test_contracts_gate_is_green_on_the_repository() -> None:

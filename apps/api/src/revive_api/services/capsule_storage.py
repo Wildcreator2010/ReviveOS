@@ -81,6 +81,8 @@ class S3CapsuleStorage:
         url, headers = self._signed_headers("GET", key)
         async with httpx.AsyncClient(**self.CLIENT_OPTIONS) as client:
             response = await client.get(url, headers=headers)
+            if response.status_code == 404:
+                raise FileNotFoundError(key)
             response.raise_for_status()
             return response.content
 

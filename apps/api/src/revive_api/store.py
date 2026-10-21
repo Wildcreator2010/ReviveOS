@@ -165,6 +165,7 @@ class MemoryStore:
         self.refresh_tokens: dict[str, RefreshRecord] = {}
         self.login_failures: dict[str, tuple[int, datetime]] = {}
         self.admin_audit: list[dict[str, Any]] = []
+        self.runtime_settings: dict[str, dict[str, Any]] = {}
         self.maintenance = False
         self._event_sequence = 0
         self.event_bus = EventBus(self)
@@ -209,12 +210,16 @@ class MemoryStore:
         self.events_by_job.setdefault(job_id, []).append(event.id)
         return event
 
-    def events_for_job(self, job_id: str, after: str | None = None) -> list[JobEventRecord]:
+    def events_for_job(self, job_id: str, after: str | int | None = None) -> list[JobEventRecord]:
         start = 0
-        if after:
+        if isinstance(after, int):
+            start = max(after, 0)
+        elif after:
             existing = self.events.get(after)
             if existing:
                 start = existing.sequence
+            elif str(after).isdigit():
+                start = int(after)
         return [
             self.events[event_id]
             for event_id in self.events_by_job.get(job_id, [])

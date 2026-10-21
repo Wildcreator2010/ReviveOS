@@ -81,7 +81,11 @@ class CredentialStore:
             except Exception:
                 pass
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(credentials.to_dict(), indent=2), encoding="utf-8")
+        # Create the file with 0600 in one step; write-then-chmod leaves a window
+        # where another local user can read a rotated refresh token.
+        descriptor = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(credentials.to_dict(), indent=2))
         try:
             os.chmod(self.path, stat.S_IRUSR | stat.S_IWUSR)
         except OSError:  # pragma: no cover - platform specific

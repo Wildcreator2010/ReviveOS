@@ -17,7 +17,7 @@ from .base import (
     estimate_cost,
     extract_json,
 )
-from .factory import SUPPORTED_PROVIDERS, ConfigSource, from_config
+from .factory import SUPPORTED_PROVIDERS, ConfigSource, from_config, from_settings
 from .fake import FakeProvider
 from .openai_adapter import OpenAIProvider, to_openai_response_format
 
@@ -38,5 +38,6 @@ __all__ = [
     "estimate_cost",
     "extract_json",
     "from_config",
+    "from_settings",
     "to_openai_response_format",
 ]

@@ -5,6 +5,7 @@ WORKDIR /app
 COPY packages/core /app/packages/core
 COPY agents /app/agents
 COPY apps/api /app/apps/api
+COPY schemas /app/schemas
 RUN pip install --no-cache-dir /app/packages/core /app/agents /app/apps/api && useradd --create-home --uid 10001 revive
 USER 10001
 EXPOSE 8000

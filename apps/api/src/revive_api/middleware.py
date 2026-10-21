@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import uuid
 
+import structlog
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+log = structlog.get_logger(__name__)
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -23,6 +26,12 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
         except Exception:
+            log.exception(
+                "http.unhandled_exception",
+                request_id=request_id,
+                method=request.method,
+                path=request.url.path,
+            )
             response = JSONResponse(
                 status_code=500,
                 content={

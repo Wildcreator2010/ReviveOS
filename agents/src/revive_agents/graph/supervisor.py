@@ -23,8 +23,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from revive_core.scoring import COMPONENTS, compute_score
+
 from ..limits import MAX_ITERATIONS
 from ..llm.base import BudgetExceeded
+from ..ports import ExecutionCancelled
 from .state import GraphState
 
 MAX_EVENTS = 200
@@ -71,6 +74,9 @@ def _as_dict(value: Any) -> dict[str, Any]:
         return {}
     if isinstance(value, dict):
         return dict(value)
+    dump = getattr(value, "to_dict", None)
+    if callable(dump):
+        return dict(dump())
     dump = getattr(value, "model_dump", None)
     if callable(dump):
         return dict(dump())
@@ -82,6 +88,9 @@ def _ok(result: Any) -> bool:
         return True
     if isinstance(result, bool):
         return result
+    ok = getattr(result, "ok", None)
+    if isinstance(ok, bool):
+        return ok
     return bool(_as_dict(result).get("ok", True))
 
 
@@ -130,6 +139,8 @@ class CompiledGraph:
         self.archaeologist_fn = _get(deps, "archaeologist")
         self.repair_fn = _get(deps, "repair")
         self.behavior_plan_fn = _get(deps, "behavior_plan")
+        self.behavior_fn = _get(deps, "behavior")
+        self.capsule_fn = _get(deps, "capsule")
         self.checkpointer = _get(deps, "checkpointer")
         self.clock: Callable[[], float] = _get(deps, "clock", time.monotonic)
         timeout = _get(deps, "timeout")
@@ -216,7 +227,17 @@ class CompiledGraph:
                 {"low_confidence_fields": low, "warnings": list(warnings)},
             )
 
+    async def _restore(self, token: Any) -> None:
+        restore = getattr(self.execution, "restore_ws", None)
+        if token is not None and callable(restore):
+            await restore(token)
+
+    async def _snapshot(self) -> Any:
+        snapshot = getattr(self.execution, "snapshot_ws", None)
+        return await snapshot() if callable(snapshot) else None
+
     async def _build_until_ok(self, state: GraphState, argv: Sequence[str]) -> bool:
+        patch_snapshot: Any = None
         while True:
             self._check_deadline()
             state.build_attempts += 1
@@ -225,6 +246,15 @@ class CompiledGraph:
             result = await self.execution.run("build", list(argv), self.timeout)
             if _ok(result):
                 return True
+            if _as_dict(result).get("timed_out") is True:
+                await self._emit(
+                    state,
+                    "job.failed",
+                    {"reason": "stage_timeout", "stage": "build", "attempt": state.build_attempts},
+                )
+                state.status = "failed"
+                state.failure_reason = "stage_timeout"
+                return False
             await self._emit(
                 state,
                 "build.failed",
@@ -233,6 +263,11 @@ class CompiledGraph:
                     "reason": str(_as_dict(result).get("reason", "")),
                 },
             )
+            # The failed build ran against the patched tree; roll it back before the
+            # next repair so retries never stack unverified diffs.
+            if patch_snapshot is not None:
+                await self._restore(patch_snapshot)
+                patch_snapshot = None
             state.error_facts.append(_as_dict(result).get("error_fact") or _as_dict(result))
             if state.build_attempts >= MAX_ITERATIONS:
                 await self._emit(
@@ -267,22 +302,19 @@ class CompiledGraph:
             applied = False
             diff = _as_dict(patch).get("diff")
             if diff:
-                await self.execution.apply_patch(diff)
-                applied = True
+                snapshot = await self._snapshot()
+                applied = _ok(await self.execution.apply_patch(diff))
+                if applied:
+                    patch_snapshot = snapshot
+                else:
+                    await self._restore(snapshot)
             await self._emit(state, "repair.applied", {"applied": applied, "attempt": state.build_attempts})
 
     def _plan(self, state: GraphState) -> Any:
-        return state.behavior_plan or {
-            "cases": [
-                {
-                    "id": "cli-help",
-                    "argv": ["--help"],
-                    "expect_files": [],
-                    "tolerance": {"mode": "exact"},
-                }
-            ],
-            "budget": {"max_cases": 25, "timeout_per_case": 30},
-        }
+        # No implicit behaviour plan: a repo without tests/importable package simply
+        # has no behaviour evidence (score stays partial) instead of running a fake
+        # "--plan" command and calling it captured.
+        return state.behavior_plan or {"cases": []}
 
     # -- entry point -----------------------------------------------------
     async def ainvoke(self, state: GraphState | None = None) -> GraphState:
@@ -300,10 +332,15 @@ class CompiledGraph:
                 "env.inferred",
                 {"confidence": _as_dict(state.genome).get("overall_confidence")},
             )
+            handle = None
             if self.execution is not None:
-                await self.execution.ensure_env(state.genome)
+                handle = await self.execution.ensure_env(state.genome)
+                state.sandbox_handle = handle
             await self._emit(state, "sandbox.created", {})
-            build_argv = _as_dict(state.project).get("build_argv", ["python", "-m", "pip", "install", "-e", "."])
+            build_argv = _as_dict(state.project).get(
+                "build_argv",
+                ["python", "-m", "pip", "install", "--no-index", "--no-deps", "--no-build-isolation", "-e", "."],
+            )
             built = await self._build_until_ok(state, build_argv)
             if not built:
                 return state
@@ -332,28 +369,29 @@ class CompiledGraph:
             else:
                 plan = self._plan(state)
             state.behavior_plan = plan
-            await self._emit(
-                state,
-                "behavior.captured",
-                {"cases": len(_as_dict(plan).get("cases", []) or [])},
-            )
-            behavior_result = await self.execution.run("behavior", ["--plan"], self.timeout)
-            await self._emit(
-                state,
-                "behavior.compared",
-                {"matched": _ok(behavior_result)},
-            )
-            state.fingerprints = _as_dict(behavior_result).get("fingerprints")
-            state.score = self._score(state, test_result, behavior_result)
+            behavior_ok = False
+            cases = len(_as_dict(plan).get("cases", []) or [])
+            if self.behavior_fn is not None and cases:
+                outcome = await self.behavior_fn(handle, plan)
+                state.fingerprints = _as_dict(outcome).get("fingerprint")
+                compatibility = _as_dict(outcome).get("compatibility")
+                state.behavior_compatibility = float(compatibility) if isinstance(compatibility, (int, float)) else None
+                behavior_ok = bool(_as_dict(outcome).get("matched"))
+                await self._emit(state, "behavior.captured", {"cases": int(_as_dict(outcome).get("cases", cases))})
+                await self._emit(state, "behavior.compared", {"matched": behavior_ok})
+            state.score = self._score(state, test_result, {"ok": behavior_ok})
             await self._emit(
                 state,
                 "score.computed",
                 {"total": _as_dict(state.score).get("total")},
             )
-            state.capsule_ref = f"capsule://{state.job_id}"
+            state.status = "succeeded"
+            if self.capsule_fn is not None:
+                state.capsule_ref = await self.capsule_fn(state)
+            else:
+                state.capsule_ref = f"capsule://{state.job_id}"
             await self._emit(state, "capsule.created", {"capsule_ref": state.capsule_ref})
             await self._emit(state, "job.succeeded", {"status": "succeeded", "capsule_ref": state.capsule_ref})
-            state.status = "succeeded"
             return state
         except _Timeout:
             await self._force_emit(state, "job.failed", {"reason": "timeout"})
@@ -374,6 +412,10 @@ class CompiledGraph:
             state.status = "failed"
             state.failure_reason = "budget"
             return state
+        except ExecutionCancelled:
+            # A caller-requested cancellation is not an internal error: let the job
+            # owner record the terminal "cancelled" state.
+            raise
         except Exception:
             await self._force_emit(state, "job.failed", {"reason": "internal_error"})
             state.status = "failed"
@@ -382,14 +424,30 @@ class CompiledGraph:
 
     @staticmethod
     def _score(state: GraphState, test_result: Any, behavior_result: Any) -> dict[str, Any]:
-        tests_ok = _ok(test_result)
+        tests_ok = _ok(test_result) and not _as_dict(state.project).get("tests_absent")
         behavior_ok = _ok(behavior_result)
-        total = 0.0
-        if tests_ok:
-            total += 50.0
-        if behavior_ok:
-            total += 50.0
-        return {"total": total, "tests_ok": tests_ok, "behavior_ok": behavior_ok}
+        dependencies = _as_dict(state.genome).get("dependencies") or []
+        confidences: list[float] = []
+        for dependency in dependencies:
+            if not isinstance(dependency, dict):
+                continue
+            try:
+                confidences.append(max(0.0, min(1.0, float(dependency.get("confidence", 0.0) or 0.0))))
+            except (TypeError, ValueError):
+                confidences.append(0.0)
+        dependencies_ratio = sum(confidences) / len(confidences) if confidences else 1.0
+        score = compute_score(
+            runtime_ok=True,
+            deps_ratio=dependencies_ratio,
+            build_ok=True,
+            tests_pass_ratio=1.0 if tests_ok else 0.0,
+            behavior_compat=state.behavior_compatibility,
+            repro_verified=False,
+        )
+        payload: dict[str, Any] = score.to_dict()
+        payload["components"] = {name: float(payload[name]) for name in COMPONENTS}
+        payload.update({"tests_ok": tests_ok, "behavior_ok": behavior_ok, "status": score.status})
+        return payload
 
 
 def _project_id(state: GraphState) -> str:

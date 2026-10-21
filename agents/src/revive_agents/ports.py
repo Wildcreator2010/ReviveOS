@@ -1,6 +1,10 @@
 from typing import Any, Protocol
 
 
+class ExecutionCancelled(RuntimeError):
+    """The caller asked to stop before the next sandbox stage."""
+
+
 class ExecutionPort(Protocol):
     async def ensure_env(self, genome: Any) -> Any: ...
     async def run(self, kind: str, argv: list[str], timeout: float) -> Any: ...

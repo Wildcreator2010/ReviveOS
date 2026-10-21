@@ -32,10 +32,23 @@ services:
       REVIVE_WORKER__TOKEN: ${REVIVE_WORKER_TOKEN:?REVIVE_WORKER_TOKEN must be set}
       DATABASE_URL: postgresql+asyncpg://revive:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/revive
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+      REVIVE_API_URL: http://api:8000
     volumes: [/var/run/docker.sock:/var/run/docker.sock]
     group_add: ["${DOCKER_GID:?DOCKER_GID must be set to the host docker group id}"]
+    depends_on:
+      api: {condition: service_healthy}
+  beat:
+    image: ${REVIVE_WORKER_IMAGE:?Set REVIVE_WORKER_IMAGE to the GHCR image path}@sha256:${WORKER_DIGEST:?WORKER_DIGEST must be set to a published digest}
+    restart: unless-stopped
+    env_file: [../../infra/envs/revive.prod.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://revive:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/revive
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379/0
+    command: ["celery", "-A", "revive_api.celery_app:celery_app", "beat", "--loglevel=INFO"]
+    depends_on:
+      redis: {condition: service_healthy}
   postgres:
-    image: postgres:16@sha256:${POSTGRES_DIGEST:?POSTGRES_DIGEST must be set}
+    image: pgvector/pgvector:pg16@sha256:${POSTGRES_DIGEST:?POSTGRES_DIGEST must be set}
     restart: unless-stopped
     env_file: [../../infra/envs/revive.prod.env]
     expose: ["5432"]

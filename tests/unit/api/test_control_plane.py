@@ -22,6 +22,25 @@ async def test_memory_control_plane_exposes_async_resource_operations() -> None:
     assert await adapter.jobs_today(user.id) == 1
 
 
+@pytest.mark.asyncio
+async def test_find_api_key_hashes_only_candidates_with_the_same_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = MemoryControlPlane(MemoryStore())
+    user = await adapter.add_user("keys@example.com", "hash")
+    first = await adapter.add_api_key(user.id, "rvk_aaaa", "hash-1")
+    await adapter.add_api_key(user.id, "rvk_bbbb", "hash-2")
+    checked: list[str] = []
+
+    def fake_verify(value: str, hashed: str) -> bool:
+        checked.append(hashed)
+        return hashed == "hash-1"
+
+    monkeypatch.setattr("revive_api.security.verify_api_key", fake_verify)
+    found = await adapter.find_api_key("rvk_aaaa-secret")
+
+    assert found is not None and found.id == first.id
+    assert checked == ["hash-1"], "keys with a different prefix must not reach Argon2"
+
+
 def test_memory_control_plane_is_not_a_production_adapter() -> None:
     assert MemoryControlPlane().durable is False
 

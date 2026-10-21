@@ -102,3 +102,17 @@ def from_config(config: Any = None) -> LLMProvider:
             raise LLMError("REVIVE_LLM__BASE_URL is required when REVIVE_LLM__PROVIDER=custom")
         return OpenAIProvider(api_key, model, base_url, provider_name="custom", **common)
     raise LLMError(f"unsupported REVIVE_LLM__PROVIDER {provider!r}; expected one of {', '.join(SUPPORTED_PROVIDERS)}")
+
+
+def from_settings(settings: Mapping[str, Any]) -> LLMProvider:
+    """Build a provider from the admin-managed runtime_settings document."""
+
+    return from_config(
+        {
+            "LLM_PROVIDER": settings.get("provider"),
+            "LLM_BASE_URL": settings.get("base_url"),
+            "LLM_MODEL": settings.get("model"),
+            "LLM_API_KEY": settings.get("api_key"),
+            "LLM_REASONING_EFFORT": settings.get("reasoning_effort"),
+        }
+    )

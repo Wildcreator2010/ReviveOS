@@ -82,6 +82,7 @@ def test_projects_jobs_crud_dedup_and_pagination(client: TestClient) -> None:
     job = client.post(f"/projects/{project['id']}/resurrect", headers=auth)
     assert job.status_code == 202
     job_id = job.json()["job_id"]
+    assert client.app.state.store.jobs[job_id].metadata["repo_url"] == project["repo_url"]
     status = client.get(f"/jobs/{job_id}", headers=auth).json()["status"]
     assert status in {"queued", "running", "succeeded"}
     assert client.get("/jobs?project_id=" + project["id"], headers=auth).json()["items"][0]["id"] == job_id
@@ -113,6 +114,15 @@ def test_refresh_rotation_reuse_revokes_family(client: TestClient) -> None:
     assert reused.status_code == 401
     assert reused.json()["error"]["code"] == "refresh_reuse_detected"
     assert client.get("/projects", headers=headers(rotated.json()["access_token"])).status_code == 200
+
+
+def test_logout_revokes_the_refresh_family(client: TestClient) -> None:
+    _, refresh_token = register(client)
+    rotated = client.post("/auth/refresh", json={"refresh_token": refresh_token}).json()
+
+    assert client.post("/auth/logout", json={"refresh_token": rotated["refresh_token"]}).status_code == 204
+    reused = client.post("/auth/refresh", json={"refresh_token": rotated["refresh_token"]})
+    assert reused.status_code == 401
 
 
 def test_quota_evidence_and_capsule_download(client: TestClient) -> None:
@@ -157,9 +167,83 @@ def test_quota_evidence_and_capsule_download(client: TestClient) -> None:
     assert denied.status_code == 401
     redirect = client.get(f"/capsules/{capsule['id']}/download", headers=auth, follow_redirects=False)
     assert redirect.status_code == 302
+    assert redirect.headers["location"].startswith("/api/v1/capsules/")
     download_path = urlparse(redirect.headers["location"]).path + "?" + urlparse(redirect.headers["location"]).query
     download = client.get(download_path)
     assert download.content == content
+
+
+def test_quota_inputs_cannot_be_rewritten_through_generic_project_metadata(client: TestClient) -> None:
+    token, _ = register(client)
+    auth = headers(token)
+    project = client.post(
+        "/projects", headers=auth, json={"repo_url": "https://github.com/acme/sized", "repo_size_mb": 12}
+    ).json()
+    assert client.app.state.store.projects[project["id"]].metadata["repo_size_mb"] == 12
+
+    patched = client.patch(
+        f"/projects/{project['id']}",
+        headers=auth,
+        json={"metadata": {"repo_size_mb": 0, "repo_key": "forged", "note": "kept"}},
+    )
+    assert patched.status_code == 200
+    metadata = client.app.state.store.projects[project["id"]].metadata
+    assert metadata["repo_size_mb"] == 12
+    assert metadata["note"] == "kept"
+    assert metadata.get("repo_key") != "forged"
+
+
+def test_non_ascii_worker_token_never_becomes_a_server_error(client: TestClient) -> None:
+    token, _ = register(client)
+    auth = headers(token)
+    project = client.post("/projects", headers=auth, json={"repo_url": "https://github.com/acme/unicode"}).json()
+    job = client.post(f"/projects/{project['id']}/resurrect", headers=auth).json()["job_id"]
+
+    response = client.post(
+        f"/jobs/{job}/capsule",
+        headers={b"X-Worker-Token": b"w\xf6rker"},
+        json={"content": ""},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_resurrect_limits_are_persisted_and_invalid_values_rejected(client: TestClient) -> None:
+    token, _ = register(client)
+    auth = headers(token)
+    project = client.post("/projects", headers=auth, json={"repo_url": "https://github.com/acme/limited"}).json()
+    accepted = client.post(
+        f"/projects/{project['id']}/resurrect",
+        headers=auth,
+        json={"budget_usd": 3.5, "timeout_seconds": 120},
+    )
+    assert accepted.status_code == 202
+    job_id = accepted.json()["job_id"]
+    assert client.app.state.store.jobs[job_id].metadata["pipeline"] == {
+        "budget_usd": 3.5,
+        "timeout_seconds": 120,
+    }
+
+    rejected = client.post(
+        f"/projects/{project['id']}/resurrect",
+        headers=auth,
+        json={"budget_usd": -1, "timeout_seconds": 0},
+    )
+    assert rejected.status_code == 422
+
+
+def test_desktop_loopback_origin_is_allowed_by_cors(client: TestClient) -> None:
+    response = client.options(
+        "/projects",
+        headers={
+            "Origin": "http://127.0.0.1:54321",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:54321"
 
 
 def test_api_v1_openapi_and_admin_maintenance(client: TestClient) -> None:

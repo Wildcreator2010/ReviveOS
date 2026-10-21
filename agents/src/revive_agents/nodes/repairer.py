@@ -11,6 +11,7 @@ the same signature return GiveUp so the supervisor can prune the branch.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import re
 import shutil
@@ -156,6 +157,39 @@ def _entry_content(entry: dict[str, Any]) -> str:
 
 def manifest_content_map(manifest: Any) -> dict[str, str]:
     return {_normalize_path(e.get("path", "")): _entry_content(e) for e in _manifest_entries(manifest)}
+
+
+_MANIFEST_SKIP_DIRS = {".git", ".venv", ".mypy_cache", ".pytest_cache", "__pycache__", "node_modules"}
+_MANIFEST_MAX_FILES = 200
+_MANIFEST_MAX_CHARS = 131_072
+
+
+def workspace_manifest(root: str | Path) -> dict[str, dict[str, str]]:
+    """Text files the repairer may touch; binaries and build dirs stay out."""
+
+    source = Path(root)
+    entries: dict[str, dict[str, str]] = {}
+    budget = _MANIFEST_MAX_CHARS
+    for path in sorted(source.rglob("*")):
+        if len(entries) >= _MANIFEST_MAX_FILES or budget <= 0:
+            break
+        if path.is_symlink() or not path.is_file():
+            continue
+        relative = path.relative_to(source)
+        if any(part in _MANIFEST_SKIP_DIRS for part in relative.parts):
+            continue
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        if b"\x00" in data[:4096]:
+            continue
+        text = data.decode("utf-8", errors="replace")
+        if len(text) > budget:
+            continue
+        entries[relative.as_posix()] = {"sha256": hashlib.sha256(data).hexdigest(), "lines": text}
+        budget -= len(text)
+    return entries
 
 
 def _materialize(manifest_map: dict[str, str], root: Path) -> None:

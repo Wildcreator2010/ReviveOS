@@ -18,7 +18,9 @@ from typing import Any, cast
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from ..store import (
     ApiKeyRecord,
@@ -62,6 +64,20 @@ def _utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value
 
 
+def _cursor_sequence(cursor: str | int | None) -> int:
+    """Accept an event id (`evt_<job>_000...042`), a bare sequence, or an int."""
+
+    if cursor is None:
+        return 0
+    if isinstance(cursor, int):
+        return max(cursor, 0)
+    text = str(cursor).strip()
+    if not text:
+        return 0
+    tail = text.rsplit("_", 1)[-1]
+    return int(tail) if tail.isdigit() else 0
+
+
 class ControlPlaneRepository:
     """Async repository over the T-BE-02 tables, on a caller-owned session."""
 
@@ -84,7 +100,11 @@ class ControlPlaneRepository:
             raise ValueError("email already registered")
         row = User(id=_id("user"), email=normalized, password_hash=password_hash, role=role)
         self.session.add(row)
-        await self.flush()
+        try:
+            await self.flush()
+        except IntegrityError as exc:
+            # A concurrent registration can pass the pre-check and hit the unique index.
+            raise ValueError("email already registered") from exc
         return self._to_user_record(row)
 
     async def get_user(self, user_id: str) -> UserRecord | None:
@@ -102,7 +122,10 @@ class ControlPlaneRepository:
         from ..security import verify_password
 
         user = await self.user_by_email(email)
-        if user is None or not verify_password(password, user.password_hash):
+        if user is None:
+            return None
+        # Argon2 is CPU-bound; keep the event loop responsive under login load.
+        if not await run_in_threadpool(verify_password, password, user.password_hash):
             return None
         return user
 
@@ -134,13 +157,15 @@ class ControlPlaneRepository:
         return self._to_api_key_record(row) if row is not None else None
 
     async def find_api_key(self, token: str) -> ApiKeyRecord | None:
-        # API keys are intentionally verified against the stored hash; the prefix is
-        # only a lookup hint and never grants access by itself.
+        # The stored prefix narrows the candidate set; the hash still decides.
+        # Verifying every key with Argon2 would make each request O(all keys).
         from ..security import verify_api_key
 
-        rows = (await self.session.scalars(select(ApiKey).where(ApiKey.revoked_at.is_(None)))).all()
+        rows = (
+            await self.session.scalars(select(ApiKey).where(ApiKey.revoked_at.is_(None), ApiKey.prefix == token[:8]))
+        ).all()
         for row in rows:
-            if verify_api_key(token, row.key_hash):
+            if await run_in_threadpool(verify_api_key, token, row.key_hash):
                 return self._to_api_key_record(row)
         return None
 
@@ -205,8 +230,8 @@ class ControlPlaneRepository:
     async def soft_delete_project(self, project_id: str) -> None:
         await self.update_project(project_id, deleted_at=_now(), status="deleted")
 
-    async def add_job(self, project_id: str, user_id: str) -> JobRecord:
-        row = Job(id=_id("job"), project_id=project_id, user_id=user_id)
+    async def add_job(self, project_id: str, user_id: str, metadata: dict[str, Any] | None = None) -> JobRecord:
+        row = Job(id=_id("job"), project_id=project_id, user_id=user_id, meta=dict(metadata or {}))
         self.session.add(row)
         await self.flush()
         await self.update_project(project_id, status="queued")
@@ -259,7 +284,9 @@ class ControlPlaneRepository:
         )
         sequence = int(last or 0) + 1
         row = JobEvent(
-            id=f"evt_{sequence:012d}",
+            # Job-scoped sequence, but the primary key is global: keep the job id in
+            # the id or the first event of every job would collide on evt_...0001.
+            id=f"evt_{job_id}_{sequence:012d}",
             sequence=sequence,
             job_id=job_id,
             project_id=job.project_id,
@@ -278,7 +305,8 @@ class ControlPlaneRepository:
             created_at=_utc(row.created_at),
         )
 
-    async def events_for_job(self, job_id: str, after_sequence: int = 0) -> list[JobEventRecord]:
+    async def events_for_job(self, job_id: str, after: str | int | None = None) -> list[JobEventRecord]:
+        after_sequence = _cursor_sequence(after)
         rows = (
             await self.session.scalars(
                 select(JobEvent)
@@ -610,6 +638,20 @@ class ControlPlaneRepository:
     async def is_maintenance(self) -> bool:
         row = await self.session.get(RuntimeSetting, "maintenance")
         return bool((row.value if row else {}).get("enabled", False))
+
+    async def get_runtime_setting(self, key: str) -> dict[str, Any] | None:
+        row = await self.session.get(RuntimeSetting, key)
+        return dict(row.value or {}) if row is not None else None
+
+    async def set_runtime_setting(self, key: str, value: dict[str, Any]) -> None:
+        row = await self.session.get(RuntimeSetting, key)
+        if row is None:
+            self.session.add(RuntimeSetting(key=key, value=dict(value)))
+        else:
+            await self.session.execute(
+                update(RuntimeSetting).where(RuntimeSetting.key == key).values(value=dict(value))
+            )
+        await self.flush()
 
     async def purge_user(self, user_id: str) -> None:
         await self.session.execute(delete(User).where(User.id == user_id))

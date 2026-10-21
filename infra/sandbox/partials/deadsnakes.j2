@@ -2,6 +2,7 @@
 # The only apt source added is the official deadsnakes PPA.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+    git \
     {{ extra_apt | pkgjoin }} \
  && add-apt-repository -y ppa:deadsnakes/ppa \
  && apt-get update \
@@ -11,5 +12,5 @@ RUN apt-get update \
     python{{ python_version }}-venv \
  && rm -rf /var/lib/apt/lists/*
 RUN python{{ python_version }} -m ensurepip --upgrade \
- && python{{ python_version }} -m pip install --upgrade pip setuptools wheel
+ && python{{ python_version }} -m pip install --upgrade pip setuptools wheel build hatchling poetry-core flit-core pytest
 

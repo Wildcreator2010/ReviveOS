@@ -37,3 +37,9 @@ def test_production_passwords_must_be_lowercase_hex() -> None:
 
 def test_valid_production_environment_passes() -> None:
     ensure_prod(valid_environment())
+
+
+def test_llm_key_may_be_configured_in_the_admin_settings_instead_of_env() -> None:
+    values = valid_environment()
+    values.pop("REVIVE_LLM__API_KEY")
+    ensure_prod(values)

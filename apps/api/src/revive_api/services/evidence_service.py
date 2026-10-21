@@ -279,7 +279,7 @@ async def persist_job_artifacts(
             job_id,
             plan_ref=str(plan_ref) if plan_ref else None,
             cases=cases,
-            compatibility=None,
+            compatibility=getattr(state, "behavior_compatibility", None),
             payload=dict(plan) if isinstance(plan, Mapping) else {},
         )
         counts["behavior"] = 1

@@ -58,7 +58,9 @@ def _object_storage_probe(endpoint: str, bucket: str) -> Probe:
             response = httpx.head(url, timeout=2.0, trust_env=False)
         except httpx.HTTPError:
             return False
-        return response.status_code < 500
+        # 403 = bucket exists but the anonymous probe lacks permission; 404 means
+        # the bucket (or path-style endpoint) is missing, so writes will fail.
+        return response.status_code < 500 and response.status_code != 404
 
     return probe
 

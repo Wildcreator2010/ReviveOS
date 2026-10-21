@@ -16,6 +16,7 @@ import asyncio
 import hashlib
 import io
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -49,6 +50,65 @@ from .executor import (
     write_artifact,
 )
 from .image_matrix import ImagePlan, Unsupported, plan_image
+
+_PIP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9._, -]+\])?$")
+_PIP_VERSION_RE = re.compile(r"^[A-Za-z0-9.*+!_~-]+$")
+_PIP_OPERATOR_RE = re.compile(r"^(===|==|>=|<=|~=|!=|>|<)[A-Za-z0-9.*+!_~-]+$")
+
+
+def _genome_mapping(genome: Any) -> Mapping[str, Any]:
+    if genome is None:
+        return {}
+    if isinstance(genome, Mapping):
+        return genome
+    dump = getattr(genome, "model_dump", None)
+    if callable(dump):
+        return dump()
+    return {}
+
+
+def dependency_specs(genome: Any) -> list[str]:
+    """Translate inferred PyPI dependencies into safe pip requirement strings.
+
+    The base image is built with network enabled; the job container itself stays
+    network-disabled, so dependencies must be installed while the image builds.
+    """
+
+    specs: list[str] = []
+    seen: set[str] = set()
+    for dependency in _genome_mapping(genome).get("dependencies") or []:
+        if not isinstance(dependency, Mapping):
+            continue
+        source = str(dependency.get("source") or "").strip().lower()
+        if source not in {"", "pypi", "pip", "requirements", "inference", "inferred"}:
+            continue
+        name = str(dependency.get("name") or "").strip()
+        if not _PIP_NAME_RE.match(name):
+            continue
+        version = str(dependency.get("version") or "").strip()
+        if not version or version.lower() in {"unknown", "latest", "*"}:
+            spec = name
+        elif version[0] in "=<>!~":
+            spec = name + version if _PIP_OPERATOR_RE.match(version) else name
+        elif _PIP_VERSION_RE.match(version):
+            spec = f"{name}=={version}"
+        else:
+            spec = name
+        if spec not in seen:
+            seen.add(spec)
+            specs.append(spec)
+    return specs
+
+
+def dockerfile_with_dependencies(dockerfile: str, specs: list[str]) -> str:
+    if not specs:
+        return dockerfile
+    line = "RUN python -m pip install --no-cache-dir " + " ".join(specs)
+    marker = "USER 1000:1000"
+    if marker in dockerfile:
+        return dockerfile.replace(marker, f"{line}\n{marker}", 1)
+    return f"{dockerfile.rstrip()}\n{line}\n"
+
 
 # --------------------------------------------------------------------------
 # Host capability probes
@@ -326,6 +386,8 @@ class LocalExecutionPort:
         assert self.source is not None
         for entry in sorted(self.source.rglob("*")):
             rel = entry.relative_to(self.source)
+            if entry.is_symlink():
+                continue
             if ".git" in rel.parts and rel.parts[0] == ".git":
                 # Keep only the git metadata when explicitly a repo; copy all.
                 pass
@@ -581,7 +643,7 @@ class DockerExecutionPort:
         return await self.ensure_env_from_plan(plan, genome=genome)
 
     async def ensure_env_from_plan(self, plan: ImagePlan, *, genome: Any = None) -> SandboxHandle:
-        dockerfile = render_dockerfile(plan)
+        dockerfile = dockerfile_with_dependencies(render_dockerfile(plan), dependency_specs(genome))
         dockerfile_path = self.base_dir / "Dockerfile.resurrected-base"
         dockerfile_path.write_text(dockerfile, encoding="utf-8")
         client = self.client
@@ -615,6 +677,7 @@ class DockerExecutionPort:
         self._handle = handle
         if self.workspace is not None and self.workspace.exists():
             self._put_directory(self.workspace, "/workspace")
+            self._chown_workspace()
         if self.events is not None:
             await self.events.emit(
                 {
@@ -631,6 +694,15 @@ class DockerExecutionPort:
         return handle
 
     # -- tar transfer ----------------------------------------------------
+    def _chown_workspace(self) -> None:
+        """put_archive extracts as root; the sandbox user must own its workspace."""
+
+        assert self._container is not None
+        result = self._container.exec_run(["chown", "-R", SANDBOX_USER, "/workspace"], user="root")
+        if result.exit_code != 0:
+            detail = (result.output or b"").decode("utf-8", "replace").strip()[:400]
+            raise SandboxError(f"cannot hand /workspace to {SANDBOX_USER}: {detail}")
+
     def _put_directory(self, source: Path, destination: str) -> None:
         assert self._container is not None
         buffer = io.BytesIO()
@@ -745,6 +817,7 @@ class DockerExecutionPort:
             ["bash", "-lc", "shopt -s dotglob; rm -rf /workspace/*"], user=SANDBOX_USER, workdir="/"
         )
         self._container.put_archive("/", payload)
+        self._chown_workspace()
         return True
 
     def list_dir(self, rel_path: str = "") -> list[str]:
@@ -781,6 +854,7 @@ class DockerExecutionPort:
         parent = str(Path(f"/workspace/{rel_path}").parent)
         self._container.exec_run(["mkdir", "-p", parent], user=SANDBOX_USER)
         self._container.put_archive(parent, buffer.getvalue())
+        self._chown_workspace()
 
     def _dockerfile_for_capsule(self, plan: ImagePlan) -> str:
         return render_dockerfile(plan)

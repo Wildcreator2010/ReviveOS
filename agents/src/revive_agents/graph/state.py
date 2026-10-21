@@ -22,6 +22,7 @@ class GraphState:
     patches: list[Any] = field(default_factory=list)
     behavior_plan: Any = None
     fingerprints: Any = None
+    behavior_compatibility: float | None = None
     score: Any = None
     capsule_ref: Any = None
     iteration_counts: dict[str, int] = field(default_factory=dict)

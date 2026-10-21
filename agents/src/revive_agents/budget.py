@@ -67,6 +67,7 @@ class BudgetedProvider:
         max_tokens: int = 1024,
         temperature: float = 0.0,
         timeout: float = 30.0,
+        reasoning_effort: str | None = None,
     ) -> Any:
         if self.budget.spent >= self.budget.limit:
             raise BudgetExceeded(f"LLM job budget {self.budget.limit:.4f} is already exhausted")
@@ -76,6 +77,7 @@ class BudgetedProvider:
             max_tokens=max_tokens,
             temperature=temperature,
             timeout=timeout,
+            reasoning_effort=reasoning_effort,
         )
         self.budget.charge(getattr(completion, "usage", None))
         return completion

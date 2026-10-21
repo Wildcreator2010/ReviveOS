@@ -87,8 +87,9 @@ class ScriptedRepairPolicy:
 class LLMRepairPolicy:
     """Wraps T-AG-04's repairer; used when a real/fake provider is configured."""
 
-    def __init__(self, provider: Any) -> None:
+    def __init__(self, provider: Any, workspace_manifest: dict[str, Any] | None = None) -> None:
         self.provider = provider
+        self.workspace_manifest = workspace_manifest or {}
 
     async def propose(self, error_fact: Any, attempt: int) -> Any:
         from revive_agents.nodes.repairer import repair  # noqa: PLC0415
@@ -98,7 +99,7 @@ class LLMRepairPolicy:
             "category": getattr(error_fact, "category", ""),
             "raw_excerpt": getattr(error_fact, "raw_excerpt", ""),
         }
-        return await repair(fact, {}, [], self.provider)
+        return await repair(fact, self.workspace_manifest, [], self.provider)
 
 
 @dataclass
@@ -263,6 +264,10 @@ class LocalPipeline:
 
         source = self._prepare_source()
         await self.emit("archaeology.started", {"path": str(source)})
+        if isinstance(self.ports.repair_policy, LLMRepairPolicy):
+            from revive_agents.nodes.repairer import workspace_manifest  # noqa: PLC0415
+
+            self.ports.repair_policy.workspace_manifest = workspace_manifest(source)
         genome = self._genome(source)
         await self.emit("env.inferred", {"python": genome.get("python", {}).get("version")})
 
@@ -308,6 +313,7 @@ class LocalPipeline:
 
         attempts = 0
         patch_outcomes: list[PatchOutcome] = []
+        applied_tokens: set[str] = set()
         while not build_result.ok and attempts < self.config.max_iterations:
             attempts += 1
             policy = self.ports.repair_policy
@@ -323,6 +329,7 @@ class LocalPipeline:
                 rerun=lambda: run_stage(handle, "build", stage_plan),
                 events=self.ports.events,
                 recorder=recorder,
+                applied_tokens=applied_tokens,
             )
             patch_outcomes.append(outcome)
             if outcome.rolled_back:

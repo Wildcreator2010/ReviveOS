@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from revive_api.db.repository import ControlPlaneRepository
+from revive_api.db.repository import ControlPlaneRepository, _cursor_sequence
 
 
 class FakeScalars:
@@ -83,3 +83,50 @@ async def test_get_user_by_id_preserves_get_user_contract() -> None:
     assert user is not None
     assert (user.id, user.email, user.role) == ("user_1", "user@example.com", "admin")
     assert user.created_at == created
+
+
+@pytest.mark.parametrize(
+    ("cursor", "expected"),
+    [
+        (None, 0),
+        ("", 0),
+        (3, 3),
+        ("4", 4),
+        ("evt_rev_job_a_000000000005", 5),
+        ("not-a-cursor", 0),
+    ],
+)
+def test_event_cursors_accept_ids_sequences_and_integers(cursor: str | int | None, expected: int) -> None:
+    assert _cursor_sequence(cursor) == expected
+
+
+@pytest.mark.asyncio
+async def test_event_primary_keys_are_unique_across_jobs() -> None:
+    class EventSession:
+        def __init__(self, job: Any) -> None:
+            self.job = job
+            self.rows: list[Any] = []
+
+        async def get(self, model: Any, key: str) -> Any:
+            return self.job if key == self.job.id else None
+
+        async def scalar(self, statement: Any) -> int:
+            return 0
+
+        def add(self, row: Any) -> None:
+            row.created_at = datetime.now(UTC)
+            self.rows.append(row)
+
+        async def flush(self) -> None:
+            return None
+
+    job_a = SimpleNamespace(id="rev_job_a", project_id="project_a")
+    job_b = SimpleNamespace(id="rev_job_b", project_id="project_b")
+
+    first = await ControlPlaneRepository(EventSession(job_a)).add_event("rev_job_a", "job.queued", {})
+    second = await ControlPlaneRepository(EventSession(job_b)).add_event("rev_job_b", "job.queued", {})
+
+    assert first.sequence == second.sequence == 1
+    assert first.id != second.id
+    assert first.id.endswith("_000000000001")
+    assert second.id.endswith("_000000000001")

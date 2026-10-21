@@ -4,8 +4,9 @@
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     ca-certificates \
+    git \
     {{ extra_apt | pkgjoin }} \
  && rm -rf /var/lib/apt/lists/*
 RUN python{{ python_version }} -m ensurepip --upgrade \
- && python{{ python_version }} -m pip install --upgrade pip setuptools wheel
+ && python{{ python_version }} -m pip install --upgrade pip setuptools wheel build hatchling poetry-core flit-core pytest
 

@@ -1,6 +1,7 @@
 # --- install channel: source compile (python.org, official) ---------------
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+    git \
     {{ extra_apt | pkgjoin }} \
  && rm -rf /var/lib/apt/lists/*
 ARG PYTHON_SOURCE_URL=https://www.python.org/ftp/python/{{ source_release }}/Python-{{ source_release }}.tgz
@@ -14,5 +15,5 @@ RUN cd /usr/src/python \
  && make altinstall \
  && rm -rf /usr/src/python
 RUN python{{ python_version }} -m ensurepip --upgrade \
- && python{{ python_version }} -m pip install --upgrade pip setuptools wheel
+ && python{{ python_version }} -m pip install --upgrade pip setuptools wheel build hatchling poetry-core flit-core pytest
 

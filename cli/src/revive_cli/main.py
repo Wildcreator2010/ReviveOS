@@ -185,6 +185,10 @@ async def _run_local_pipeline(
             from revive_agents.llm.factory import from_config
 
             provider = from_config()
+            if budget_usd > 0:
+                from revive_agents.budget import BudgetedProvider, JobBudget
+
+                provider = BudgetedProvider(provider, JobBudget(budget_usd, job_id=job_id))
             repair_policy = LLMRepairPolicy(provider)
         except Exception:
             provider = None
@@ -247,8 +251,7 @@ def resurrect(
         job = client.submit_resurrection(
             repo_url,
             budget_usd=budget_usd,
-            timeout=timeout,
-            keep_sandbox=keep_sandbox,
+            timeout_seconds=timeout,
         )
         terminal: str | None = None
         for item in client.stream_events(job.id):
@@ -259,8 +262,16 @@ def resurrect(
             if kind in {"job.succeeded", "job.failed"}:
                 terminal = kind
                 break
-        if client.access_token != store.load().access_token or client.refresh_token != store.load().refresh_token:
-            _persist_client_credentials(client, store)
+        if terminal is None:
+            # The stream can end early (proxy timeout, lost connection). Never
+            # report success unless a terminal event or the job resource says so.
+            status = client.get_job(job.id).status
+            if status == "succeeded":
+                terminal = "job.succeeded"
+            elif status in {"failed", "cancelled"}:
+                terminal = "job.failed"
+            else:
+                _fail("事件流提前结束，任务尚未到达终态", 2)
         if terminal == "job.failed":
             raise typer.Exit(1)
     except typer.Exit:
@@ -268,7 +279,14 @@ def resurrect(
     except Exception as exc:
         _fail(str(exc), 2)
     finally:
-        client.close()
+        try:
+            if client.access_token != store.load().access_token or client.refresh_token != store.load().refresh_token:
+                _persist_client_credentials(client, store)
+        except Exception:
+            # A credential-store failure must not turn a completed job into a CLI error.
+            pass
+        finally:
+            client.close()
 
 
 @app.command()

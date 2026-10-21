@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
 from revive_agents.graph import EVENT_TYPES, GraphState, build_graph
 from revive_agents.llm import BudgetExceeded
 from revive_agents.nodes import GiveUp, Refused
+from revive_agents.ports import ExecutionCancelled
 from revive_core import schemas
+from revive_core.sandbox.executor import RunResult
 
 HIGH_CONFIDENCE = {
     "python": {"version": "3.11", "confidence": 0.95, "evidence": []},
@@ -84,15 +87,25 @@ async def test_success_script_event_order_matches_contract():
     async def archaeologist(genome, low, corpus, provider):
         return Outcome(raised)
 
+    async def behavior(handle, plan):
+        return {
+            "fingerprint": {"plan_ref": "behavior-plan.json", "captured_at": "2026-01-01T00:00:00Z", "cases": []},
+            "compatibility": 1.0,
+            "matched": True,
+            "cases": 1,
+        }
+
     deps = {
         "execution": FakeExecution(build_ok=True),
         "events": collector,
         "archaeologist": archaeologist,
+        "behavior": behavior,
     }
     state = GraphState(
         job_id="job-success",
         project={"id": "p1", "build_argv": ["build-it"]},
         genome=LOW_CONFIDENCE,
+        behavior_plan={"cases": [{"id": "smoke", "argv": ["true"]}]},
     )
     result = await build_graph(deps).ainvoke(state)
 
@@ -260,3 +273,77 @@ async def test_every_event_matches_the_job_event_contract():
         assert event["type"] in EVENT_TYPES
         datetime.fromisoformat(event["ts"])
         schemas.validate(event, "job-event")
+
+
+async def test_run_result_with_nonzero_exit_code_is_a_failed_build():
+    """Regression: a dataclass RunResult used to be coerced to {'value': ...} and
+    therefore always reported success, even for exit_code=1."""
+
+    class RunResultExecution(FakeExecution):
+        async def run(self, kind, argv, timeout):
+            if kind == "build":
+                return RunResult(kind="build", argv=list(argv), exit_code=1, backend="test")
+            return {"ok": True}
+
+    collector = EventCollector()
+    deps = {"execution": RunResultExecution(), "events": collector, "repair": _refuse}
+    state = GraphState(job_id="job-runresult", project={"id": "p9"}, genome=HIGH_CONFIDENCE)
+    result = await build_graph(deps).ainvoke(state)
+
+    assert result.status == "failed"
+    assert result.failure_reason == "repair_budget_exhausted"
+    assert collector.types.count("build.failed") == 5
+    assert "job.succeeded" not in collector.types
+
+
+async def _refuse(error_fact, manifest, prior_attempts, provider):
+    return Refused("scripted refusal")
+
+
+async def test_failed_build_rolls_back_the_patch_before_the_next_attempt():
+    class RollbackExecution(FakeExecution):
+        def __init__(self) -> None:
+            super().__init__(build_ok=False)
+            self.snapshots: list[str] = []
+            self.restored: list[str] = []
+
+        async def snapshot_ws(self):
+            token = f"snap-{len(self.snapshots) + 1}"
+            self.snapshots.append(token)
+            return token
+
+        async def restore_ws(self, token):
+            self.restored.append(token)
+
+        async def apply_patch(self, diff):
+            self.calls.append(("apply_patch", diff))
+            return {"ok": True}
+
+    async def repair(error_fact, manifest, prior_attempts, provider):
+        return {"diff": "--- a/x.py\n+++ b/x.py\n@@ -1 +1 @@\n-1\n+2\n", "touched_files": ["x.py"]}
+
+    execution = RollbackExecution()
+    deps = {"execution": execution, "events": EventCollector(), "repair": repair}
+    state = GraphState(
+        job_id="job-rollback",
+        project={"id": "p10", "workspace_manifest": {"x.py": {"content": "1\n"}}},
+        genome=HIGH_CONFIDENCE,
+    )
+    result = await build_graph(deps).ainvoke(state)
+
+    assert result.status == "failed"
+    assert execution.snapshots == ["snap-1", "snap-2", "snap-3", "snap-4"]
+    assert execution.restored == execution.snapshots
+
+
+async def test_caller_cancellation_propagates_instead_of_becoming_internal_error():
+    class CancellingExecution(FakeExecution):
+        async def ensure_env(self, genome):
+            raise ExecutionCancelled("user_cancelled")
+
+    collector = EventCollector()
+    deps = {"execution": CancellingExecution(), "events": collector}
+    state = GraphState(job_id="job-cancel", project={"id": "p11"}, genome=HIGH_CONFIDENCE)
+
+    with pytest.raises(ExecutionCancelled):
+        await build_graph(deps).ainvoke(state)

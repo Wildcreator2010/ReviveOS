@@ -23,7 +23,7 @@ from typing import Any, Protocol, runtime_checkable
 # of hard-coding flags, so a security review has exactly one place to read.
 # --------------------------------------------------------------------------
 SANDBOX_USER = "1000:1000"
-TMPFS_SPEC = "/tmp:rw,noexec,nosuid,size=256m"
+TMPFS_SPEC = "rw,noexec,nosuid,size=256m"
 LABEL_KEY = "revive.job_id"
 NETWORK_DISABLED = True
 NO_NEW_PRIVILEGES = True

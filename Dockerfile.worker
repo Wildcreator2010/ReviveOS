@@ -5,7 +5,17 @@ WORKDIR /app
 COPY packages/core /app/packages/core
 COPY agents /app/agents
 COPY apps/api /app/apps/api
+COPY schemas /app/schemas
+# DockerExecutionPort renders these templates at runtime; the installed package
+# alone cannot locate them because _workspace_root walks up from /app.
+COPY infra/sandbox /app/infra/sandbox
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir '/app/packages/core[docker]' '/app/agents[graph]' /app/apps/api \
-    && useradd --create-home --uid 10001 revive
+    && useradd --create-home --uid 10001 revive \
+    && mkdir -p /work \
+    && chown 10001:10001 /work
 USER 10001
+WORKDIR /work
 CMD ["celery", "-A", "revive_api.celery_app:celery_app", "worker", "--loglevel=INFO", "--queues=revive", "--concurrency=2"]

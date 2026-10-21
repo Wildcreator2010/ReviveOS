@@ -1,6 +1,7 @@
 # --- install channel: conda (repo.anaconda.com, whitelisted) --------------
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+    git \
     {{ extra_apt | pkgjoin }} \
  && rm -rf /var/lib/apt/lists/*
 ARG MINICONDA_URL={{ miniconda_url | urlv }}
@@ -11,5 +12,5 @@ RUN /opt/conda/bin/conda create -y -n revive python={{ python_version }} \
       --override-channels -c {{ conda_channel_url | urlq }} \
  && /opt/conda/envs/revive/bin/conda clean -afy
 ENV PATH=/opt/conda/envs/revive/bin:/opt/conda/bin:$PATH
-RUN python -m pip install --upgrade pip setuptools wheel
+RUN python -m pip install --upgrade pip setuptools wheel build hatchling poetry-core flit-core pytest
 

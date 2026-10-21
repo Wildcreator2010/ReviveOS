@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -105,6 +105,11 @@ class ResurrectResponse(BaseModel):
     status: str = "queued"
 
 
+class ResurrectRequest(BaseModel):
+    budget_usd: float | None = Field(default=None, ge=0, le=1000)
+    timeout_seconds: float | None = Field(default=None, ge=1, le=86400)
+
+
 class EvidenceResponse(BaseModel):
     id: str
     project_id: str
@@ -147,6 +152,33 @@ class MaintenanceRequest(BaseModel):
 
 class MaintenanceResponse(BaseModel):
     accepting_jobs: bool
+
+
+class LlmSettingsRequest(BaseModel):
+    provider: Literal["fake", "openai", "anthropic", "custom"]
+    base_url: str = Field(default="", max_length=2048)
+    model: str = Field(default="", max_length=256)
+    api_key: str | None = Field(default=None, max_length=512)
+    clear_api_key: bool = False
+    reasoning_effort: Literal["low", "medium", "high"] | None = None
+
+
+class LlmSettingsResponse(BaseModel):
+    provider: str
+    base_url: str = ""
+    model: str = ""
+    reasoning_effort: str | None = None
+    api_key_set: bool = False
+    api_key_hint: str | None = None
+    source: str = "runtime"
+
+
+class LlmTestResponse(BaseModel):
+    ok: bool
+    provider: str
+    model: str = ""
+    latency_ms: int | None = None
+    detail: str | None = None
 
 
 class EventResponse(BaseModel):

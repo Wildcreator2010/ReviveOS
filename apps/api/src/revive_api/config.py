@@ -23,9 +23,10 @@ def _int_env(name: str, default: int) -> int:
 class Config:
     environment: str = "dev"
     cors_origins: list[str] = field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     database_url: str = ""
     redis_url: str = ""
-    llm_provider: str = "custom"
+    llm_provider: str = "fake"
     llm_base_url: str = ""
     llm_model: str = ""
     jwt_secret: str = "dev-only-change-me"
@@ -51,9 +52,10 @@ class Config:
         config = cls(
             environment=os.getenv("REVIVE_ENV", "dev"),
             cors_origins=_csv(os.getenv("REVIVE_CORS_ORIGINS", "http://localhost:3000")),
+            cors_origin_regex=os.getenv("REVIVE_CORS_ORIGIN_REGEX", r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"),
             database_url=os.getenv("DATABASE_URL", ""),
             redis_url=os.getenv("REDIS_URL", ""),
-            llm_provider=os.getenv("REVIVE_LLM__PROVIDER", "custom"),
+            llm_provider=os.getenv("REVIVE_LLM__PROVIDER", "fake"),
             llm_base_url=os.getenv("REVIVE_LLM__BASE_URL", ""),
             llm_model=os.getenv("REVIVE_LLM__MODEL", ""),
             jwt_secret=os.getenv("REVIVE_JWT__SECRET", "dev-only-change-me"),

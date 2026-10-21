@@ -7,8 +7,11 @@ repository can be installed behind the same seam without leaking ORM objects.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Any, Protocol
+
+from starlette.concurrency import run_in_threadpool
 
 from .security import verify_password
 from .store import (
@@ -33,7 +36,7 @@ class ControlPlanePort(Protocol):
     async def add_project(self, user_id: str, repo_url: str, repo_key: str = "") -> ProjectRecord: ...
     async def get_project(self, project_id: str) -> ProjectRecord | None: ...
     async def list_projects(self, user_id: str) -> list[ProjectRecord]: ...
-    async def add_job(self, project_id: str, user_id: str) -> JobRecord: ...
+    async def add_job(self, project_id: str, user_id: str, metadata: dict[str, Any] | None = None) -> JobRecord: ...
     async def get_job(self, job_id: str) -> JobRecord | None: ...
     async def list_jobs(self, user_id: str, project_id: str | None = None) -> list[JobRecord]: ...
     async def update_job(self, job_id: str, **fields: Any) -> None: ...
@@ -64,9 +67,11 @@ class ControlPlanePort(Protocol):
         excerpt: str | None = None,
     ) -> EvidenceRecord: ...
     async def latest_job(self, project_id: str) -> JobRecord | None: ...
-    async def events_for_job(self, job_id: str, after: str | None = None) -> list[JobEventRecord]: ...
+    async def events_for_job(self, job_id: str, after: str | int | None = None) -> list[JobEventRecord]: ...
     async def is_maintenance(self) -> bool: ...
     async def set_maintenance(self, enabled: bool) -> None: ...
+    async def get_runtime_setting(self, key: str) -> dict[str, Any] | None: ...
+    async def set_runtime_setting(self, key: str, value: dict[str, Any]) -> None: ...
     async def list_admin_jobs(self, status: str | None = None) -> list[JobRecord]: ...
     async def llm_cost_by_provider(self, since: datetime) -> dict[str, float]: ...
     async def append_audit(
@@ -103,6 +108,11 @@ class MemoryControlPlane:
         self.store = store or MemoryStore()
 
     async def add_user(self, email: str, password_hash: str, role: str = "user") -> UserRecord:
+        if role == "user":
+            # Development-only bootstrap; production admins are promoted in PostgreSQL.
+            bootstrap = os.getenv("REVIVE_DEV_ADMIN_EMAIL", "").strip().lower()
+            if bootstrap and email.strip().lower() == bootstrap:
+                role = "admin"
         return self.store.add_user(email, password_hash, role)
 
     async def user_by_email(self, email: str) -> UserRecord | None:
@@ -110,7 +120,7 @@ class MemoryControlPlane:
 
     async def authenticate(self, email: str, password: str) -> UserRecord | None:
         user = self.store.user_by_email(email)
-        if user is None or not verify_password(password, user.password_hash):
+        if user is None or not await run_in_threadpool(verify_password, password, user.password_hash):
             return None
         return user
 
@@ -139,7 +149,7 @@ class MemoryControlPlane:
     async def latest_job(self, project_id: str) -> JobRecord | None:
         return next((job for job in reversed(list(self.store.jobs.values())) if job.project_id == project_id), None)
 
-    async def events_for_job(self, job_id: str, after: str | None = None) -> list[JobEventRecord]:
+    async def events_for_job(self, job_id: str, after: str | int | None = None) -> list[JobEventRecord]:
         return self.store.events_for_job(job_id, after)
 
     async def is_maintenance(self) -> bool:
@@ -147,6 +157,13 @@ class MemoryControlPlane:
 
     async def set_maintenance(self, enabled: bool) -> None:
         self.store.maintenance = enabled
+
+    async def get_runtime_setting(self, key: str) -> dict[str, Any] | None:
+        value = self.store.runtime_settings.get(key)
+        return dict(value) if value is not None else None
+
+    async def set_runtime_setting(self, key: str, value: dict[str, Any]) -> None:
+        self.store.runtime_settings[key] = dict(value)
 
     async def list_admin_jobs(self, status: str | None = None) -> list[JobRecord]:
         jobs = [job for job in self.store.jobs.values() if status is None or job.status == status]
@@ -193,9 +210,12 @@ class MemoryControlPlane:
             reverse=True,
         )
 
-    async def add_job(self, project_id: str, user_id: str) -> JobRecord:
+    async def add_job(self, project_id: str, user_id: str, metadata: dict[str, Any] | None = None) -> JobRecord:
         project = self.store.projects[project_id]
-        return self.store.add_job(project)
+        job = self.store.add_job(project)
+        if metadata:
+            job.metadata.update(metadata)
+        return job
 
     async def get_job(self, job_id: str) -> JobRecord | None:
         return self.store.jobs.get(job_id)
@@ -253,8 +273,13 @@ class MemoryControlPlane:
     async def find_api_key(self, token: str) -> ApiKeyRecord | None:
         from .security import verify_api_key
 
+        prefix = token[:8]
         for key in self.store.api_keys.values():
-            if key.revoked_at is None and verify_api_key(token, key.key_hash):
+            if (
+                key.revoked_at is None
+                and key.prefix == prefix
+                and await run_in_threadpool(verify_api_key, token, key.key_hash)
+            ):
                 return key
         return None
 
