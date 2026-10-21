@@ -8,10 +8,10 @@
 
 | 形态 | 位置 | 状态 |
 | --- | --- | --- |
-| Web 控制台（Next.js 静态导出，Software ICU） | `apps/web` | 已验证（typecheck / lint / OpenAPI 类型生成） |
+| Web 控制台（Next.js 静态导出，Software ICU） | `apps/web` | 已验证（typecheck / lint / build / OpenAPI 类型生成 / 登录注册浏览器实测） |
 | 桌面软件（Electron 壳 + 托盘/设置/静态服务） | `apps/desktop` | 已验证（`tsc` 编译）；安装包待沙箱外打包 |
 | CLI（analyze / resurrect / verify / replay / login / download / jobs） | `cli` | 已验证（`--help` 与命令注册） |
-| 后端控制面（FastAPI） | `apps/api` | 已验证（371 项测试；72 个操作/58 条路径） |
+| 后端控制面（FastAPI） | `apps/api` | 已验证（412 项测试；80 个操作/64 条路径） |
 | 核心引擎（考古、环境推断、沙箱、评分、胶囊） | `packages/core` | 已验证（单元/契约测试） |
 | 智能体（LLM provider、prompt、supervisor 图） | `agents` | 已验证（含 prompt 黄金哈希） |
 | 契约（4 个 JSON Schema + OpenAPI 快照） | `schemas` | 已验证（含漂移测试） |
@@ -46,13 +46,13 @@ Browser / Desktop / CLI
 
 | 门禁 | 命令 | 结果 |
 | --- | --- | --- |
-| 全量测试 | `.venv\Scripts\python.exe -m pytest -q` | **371 passed, 20 skipped**（skip 全部为 `requires_docker`） |
+| 全量测试 | `.venv\Scripts\python.exe -m pytest -q` | **412 passed, 21 skipped**（skip 全部为 `requires_docker` 与本机不允许建符号链接的用例） |
 | Lint | `ruff check <PY_PATHS>` | All checks passed |
-| 格式 | `ruff format --check <PY_PATHS>` | 200 files already formatted |
+| 格式 | `ruff format --check <PY_PATHS>` | 209 files already formatted |
 | 类型 | `mypy packages/core/src cli/src agents/src apps/api/src` | Success: 113 source files |
 | Schema 契约 | `python tools/check_contracts.py` | OK (5 schemas, 10 fixtures) |
 | 红线规则 | `python tools/check_global_rules.py .` | OK（无密钥、修复上限完好） |
-| OpenAPI 漂移 | `pytest tests/unit/api/test_openapi_contract.py` | 快照 == 运行时（58 路径 / 72 操作） |
+| OpenAPI 漂移 | `pytest tests/unit/api/test_openapi_contract.py` | 快照 == 运行时（64 路径 / 80 操作） |
 | 镜像 digest 占位符 | `python tools/image_digests.py` | 通过（无全零占位） |
 | 生产栈构造 | `pytest tests/unit/api/test_app_lifespan.py ...` | UoW/engine/事件/限流/存储装配正确 |
 | 对象存储往返 | `pytest tests/unit/api/test_capsule_storage_http.py` | 真实 HTTP PUT/GET/DELETE + SigV4 头 |
@@ -60,6 +60,8 @@ Browser / Desktop / CLI
 | 迁移链 | `python -m alembic -c apps/api/alembic.ini history` | `<base>→0001→0002→0003→0004 (head)` |
 | 前端类型 | `pnpm --filter web typecheck` | 通过 |
 | 前端 lint | `pnpm --filter web lint` | No ESLint warnings or errors |
+| 前端生产构建 | `pnpm --filter web build` | 通过（13 个路由、18 个静态页面，含 `/login`） |
+| 登录链路 | 本机 API + 静态控制台 + 浏览器 | 注册 → 控制台在线 → 退出登录，实测通过 |
 | 桌面壳编译 | `pnpm --filter desktop build` | 通过 |
 | pre-commit | `python -m pre_commit run --all-files` | 6/6 hooks Passed |
 
@@ -67,9 +69,10 @@ Browser / Desktop / CLI
 
 本沙箱的两个硬限制（已实测、非配置问题）：
 
-1. **Docker daemon 不可达**：`docker info` 报命名管道缺失 → 一切 `requires_docker` 用例 skip。
-2. **无法创建子进程（`spawn EPERM`）**：`next build` / `next dev` / Electron 打包都要 fork；
-   Next 14.2.35 内置 jest-worker 只有 `ChildProcessWorker`，`experimental.workerThreads` 无效。
+1. **Docker daemon 不可达**：`docker info` 报命名管道缺失 → 一切 `requires_docker` 用例 skip；
+   镜像构建、Compose 运行、Postgres/Redis/MinIO 联调仍须在目标机或 CI 完成。Compose 静态解析
+   （含新增的 beat 服务与 worker 的 `REVIVE_API_URL`）已用 `docker compose config` 校验。
+2. **Electron 安装包**仍需在可 fork 的普通终端执行 `pnpm --filter desktop dist`；壳的 `tsc` 已通过。
 
 请在普通终端 / CI 执行：
 
@@ -89,8 +92,7 @@ $env:DATABASE_URL="postgresql+asyncpg://revive:revive@localhost:5432/revive"
 $env:REVIVE_DOCKER_AVAILABLE="1"
 .venv\Scripts\python.exe -m pytest -q tests -m requires_docker
 
-# 5) Web 生产构建 + 桌面安装包
-pnpm --filter web build
+# 5) 桌面安装包（Web 生产构建已在本机通过）
 pnpm --filter desktop dist
 
 # 6) 生产拓扑静态校验
@@ -110,11 +112,16 @@ Web 首页冒烟。tag 触发的 `release.yml` 负责 GHCR 发布、Trivy 门禁
 
 1. 第一次 tag 发布，确认 `release.yml` 全绿并记录三镜像 digest。
 2. 解析并审核 Postgres/Redis/Caddy 基础镜像 digest，填入 `infra/envs/compose.env.template`。
-3. 用 secret manager 生成 `infra/envs/revive.prod.env`（S3/LLM/JWT/worker token/DB 口令）。
+3. 用 secret manager 生成 `infra/envs/revive.prod.env`（S3/JWT/worker token/DB 口令；LLM 凭据可在管理端设置页配置）。
 4. 配置域名与 TLS；仅暴露 80/443。
 5. 演练 `infra/backup/` 的备份与**恢复**（需要离机保留）。
 6. worker 挂载 Docker socket 等价于宿主 root：必须专用隔离主机。
-7. 若需“构造即复现”的镜像，把 Dockerfile 切到 `uv sync --frozen` 并 digest 锁定基础镜像
+7. 首个管理员：先通过 `/login` 注册普通账号，再在数据库中执行
+   `UPDATE users SET role='admin' WHERE email='<admin-email>';`（系统没有自助提权入口）。
+8. 若 Web 与 API 不同源，设置 `REVIVE_CORS_ORIGINS`（或 `REVIVE_CORS_ORIGIN_REGEX`）；
+   Compose 已把 worker 的 `REVIVE_API_URL` 固定为内部 `http://api:8000`，胶囊上传依赖它。
+9. 建议设置 `REVIVE_LLM__JOB_BUDGET_USD`，并按宿主环境调整 `REVIVE_QUOTA__*`。
+10. 若需“构造即复现”的镜像，把 Dockerfile 切到 `uv sync --frozen` 并 digest 锁定基础镜像
    （当前从 `pyproject.toml` 安装、基础镜像为 tag）。
 
 ## 6. 已知限制与取舍（诚实清单）
@@ -124,5 +131,6 @@ Web 首页冒烟。tag 触发的 `release.yml` 负责 GHCR 发布、Trivy 门禁
 - 内存后端（`MemoryStore` / `MemoryCapsuleStorage` / `MemoryLoginThrottle`）只用于 dev 与测试；
   生产路径有静态护栏测试（`test_no_memory_fallback.py`）防止回流。
 - 登录限流用 Redis 计数，语义是“窗口内失败次数 + 锁定 TTL”，非精确滑动窗口。
+- 注册当前开放且无邮箱验证；生产入口建议在反向代理/WAF 增加注册限流。登录锁定按邮箱计数，存在被恶意连续失败定向锁号的风险，必要时改为“邮箱 + 来源 IP”双键。
 - 取消是**协作式**：API 写 `cancel_requested`，worker 在阶段边界检查；不保证立即杀死进程。
 - `revivebench` 的数字必须来自真实运行；未跑过的格子写“待测”，仓库内无编造数据。

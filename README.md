@@ -98,9 +98,8 @@ docker compose -f infra/compose/dev.docker-compose.yml up -d   # 需在沙箱外
 1. **Docker 在 DSH 沙箱内不可用**：沙箱禁止访问命名管道，`docker info` 报 permission denied。
    所有带 `requires_docker` 标记的集成测试在本会话中会被跳过；请在**沙箱外的普通终端**执行。
    这包括新增的跨进程持久化验收 `tests/integration/api/test_api_persistence.py`。
-2. **`next build` / `next dev` 在沙箱内不可用**：Next 14 内置 jest-worker 只有
-   `ChildProcessWorker`（无线程实现），必须 fork，而沙箱禁止 spawn（`EPERM`）。
-   Web/Electron 构建请在沙箱外或 CI 执行；沙箱内可跑 `web typecheck`、`web lint`。
+2. **`next build` / `next dev`**：本轮 `pnpm --filter web build` 已在本机实测通过（18 个静态页面）。
+   若其他沙箱仍报 `spawn EPERM`，请在普通终端或 CI 执行；沙箱内至少可跑 `web typecheck`、`web lint`。
 3. **registry.npmjs.org 不可达**，但 `registry.npmmirror.com` 可达；仓库根 `.npmrc` 已固定镜像源。
 4. **Windows 原生 TLS 栈（curl / Invoke-WebRequest / certutil）被拦截**，下载请用 Python+urllib 或 uv。
    大文件需使用分块 Range 下载（见 `tools/fetch_git_range.py` 的做法）。
@@ -109,6 +108,8 @@ docker compose -f infra/compose/dev.docker-compose.yml up -d   # 需在沙箱外
 详见 [docs/dev-environment.md](docs/dev-environment.md)。
 
 ## 三·五、交付状态
+
+设置页支持自定义壁纸（URL / 本地上传 / 预设）和管理员模型提供方配置（fake / openai / anthropic / custom，密钥加密存储）。
 
 **[DELIVERY.md](DELIVERY.md)** 是本仓库的交付收口证据表：已验证门禁、待沙箱外验证项（含精确命令）、
 上线前人工清单、以及已知限制。阅读顺序建议：本文件 → DELIVERY → [生产就绪](docs/production-readiness.md)。
