@@ -128,5 +128,5 @@ docker compose -f infra/compose/dev.docker-compose.yml up -d   # 需在沙箱外
 - [总览与派发指南](docs/tasks/00-总览与派发指南.md)
 - [01 基础设施与契约](docs/tasks/01-基础设施与契约.md) · [02 核心域与考古引擎](docs/tasks/02-核心域与考古引擎.md) · [03 智能体与模型接入](docs/tasks/03-智能体与模型接入.md) · [04 沙箱与复生流水线](docs/tasks/04-沙箱与复生流水线.md) · [05 后端 API 与数据层](docs/tasks/05-后端API与数据层.md) · [06 前端 Web 控制台](docs/tasks/06-前端Web控制台.md) · [07 生产化安全与部署](docs/tasks/07-生产化安全与部署.md) · [08 ReviveBench 与 Demo 交付](docs/tasks/08-ReviveBench与Demo交付.md)
 - [Agent 工作包索引](docs/agents/README.md)
-- [开发环境](docs/dev-environment.md) · [桌面软件](docs/desktop-app.md)
+- [使用方案](docs/ReviveOS-使用方案.pdf) · [开发环境](docs/dev-environment.md) · [桌面软件](docs/desktop-app.md)
 - [市场调研报告](research/ReviveOS市场调研报告.md)

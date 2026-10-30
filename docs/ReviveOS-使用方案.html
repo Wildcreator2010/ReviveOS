@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ReviveOS 使用方案</title>
+<style>
+@page { size: A4; margin: 17mm 16mm 18mm; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif; color: #26222f; font-size: 9.8pt; line-height: 1.72; background: #fff; }
+.cover { min-height: 258mm; margin: 0; padding: 26mm 22mm; background: #0b0e13; color: #f4f7f6; border-radius: 4mm; position: relative; overflow: hidden; break-after: page; }
+.cover::before { content: ""; position: absolute; right: -40mm; top: -30mm; width: 150mm; height: 150mm; border-radius: 50%; background: radial-gradient(circle, rgba(110,231,199,.22), rgba(110,231,199,0) 65%); }
+.cover::after { content: ""; position: absolute; left: -30mm; bottom: -50mm; width: 180mm; height: 180mm; border-radius: 50%; background: radial-gradient(circle, rgba(132,84,233,.22), rgba(132,84,233,0) 65%); }
+.brand { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 30pt; font-weight: 700; letter-spacing: -1px; position: relative; z-index: 1; }
+.brand span { color: #6ee7c7; }
+.cover-kicker { margin-top: 4mm; color: #6ee7c7; font-family: Consolas, monospace; font-size: 8.5pt; letter-spacing: .22em; position: relative; z-index: 1; }
+.cover h1 { font-size: 44pt; line-height: 1.1; margin: 42mm 0 4mm; font-weight: 700; position: relative; z-index: 1; }
+.cover-sub { font-size: 17pt; color: #d9d5e3; margin: 0 0 18mm; position: relative; z-index: 1; }
+.cover-tags { color: #b9b2c7; font-size: 10pt; letter-spacing: .04em; position: relative; z-index: 1; }
+.cover-meta { position: absolute; left: 22mm; bottom: 22mm; color: #8d879c; font-family: Consolas, monospace; font-size: 9pt; z-index: 1; }
+.cover-rule { width: 48mm; height: 2px; background: #6ee7c7; margin: 8mm 0 12mm; position: relative; z-index: 1; }
+.toc { break-after: page; padding-top: 4mm; }
+.toc h2 { border: 0; padding: 0; margin: 0 0 6mm; font-size: 22pt; }
+.toc ol { margin: 0; padding-left: 7mm; font-size: 11pt; line-height: 2.1; }
+.toc li { margin: 0; }
+.toc a { color: #26222f; text-decoration: none; }
+.toc .quick { margin-top: 14mm; padding: 5mm 6mm; background: #f7f4fb; border-left: 3px solid #8454e9; border-radius: 2mm; font-size: 9.5pt; color: #514a5f; }
+.toc .quick strong { color: #26222f; }
+h2 { font-size: 18pt; line-height: 1.35; margin: 12mm 0 4mm; padding-top: 5mm; border-top: 1.5px solid #e8e3ef; break-after: avoid; color: #26222f; }
+h2:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+h3 { font-size: 12.5pt; margin: 7mm 0 2.5mm; break-after: avoid; color: #3d3549; }
+h4 { font-size: 10.5pt; margin: 5mm 0 2mm; break-after: avoid; }
+p { margin: 2mm 0 3mm; }
+a { color: #6b40c9; text-decoration: none; }
+strong { color: #1e1a27; }
+hr { border: 0; border-top: 1px solid #e8e3ef; margin: 7mm 0; }
+blockquote { margin: 4mm 0; padding: 3mm 5mm; background: #f7f3ff; border-left: 3px solid #8454e9; color: #5b5269; }
+blockquote p { margin: 1mm 0; }
+code { font-family: Consolas, "Cascadia Mono", "Microsoft YaHei", monospace; font-size: .9em; background: #f2eef9; color: #5b3c8c; padding: .2mm 1.2mm; border-radius: 1.2mm; overflow-wrap: anywhere; }
+pre.code { background: #0e1117; color: #e7edf4; border-radius: 2.5mm; padding: 4mm 5mm; margin: 3mm 0; font-size: 7.7pt; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; break-inside: auto; border: 1px solid #222a35; }
+pre.code code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+ul, ol { margin: 2mm 0 3mm; padding-left: 6mm; }
+li { margin: 1mm 0; }
+.checkbox { font-family: "Segoe UI Symbol", "Microsoft YaHei", sans-serif; color: #6b40c9; font-weight: 700; }
+.table-wrap { margin: 3mm 0 5mm; break-inside: auto; }
+table { width: 100%; border-collapse: collapse; table-layout: auto; font-size: 8.3pt; line-height: 1.55; }
+th { background: #f4f1f9; color: #51445f; font-weight: 600; text-align: left; }
+th, td { border-bottom: 1px solid #e8e3ef; padding: 2mm 2.4mm; vertical-align: top; overflow-wrap: anywhere; }
+tr { break-inside: avoid; }
+thead { display: table-header-group; }
+.note { font-size: 8.5pt; color: #756d80; }
+@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } a { color: #6b40c9; } }
+</style>
+</head>
+<body>
+<section class="cover">
+  <div class="brand">Revive<span>OS</span></div>
+  <div class="cover-kicker">SOFTWARE RUNTIME RESURRECTION</div>
+  <h1>使用方案</h1>
+  <div class="cover-rule"></div>
+  <p class="cover-sub">从提交仓库到下载胶囊</p>
+  <div class="cover-tags">Web 控制台 · CLI · API / CI · 生产部署</div>
+  <div class="cover-meta">2026.10 · 生产部署版</div>
+</section>
+<section class="toc">
+  <h2>目录</h2>
+  <ol><li><a href="#sec-2">先选入口</a></li><li><a href="#sec-4">使用前准备</a></li><li><a href="#sec-9">Web 控制台完整流程</a></li><li><a href="#sec-17">CLI 使用</a></li><li><a href="#sec-25">API 与 CI</a></li><li><a href="#sec-33">生产部署</a></li><li><a href="#sec-42">任务内部限制</a></li><li><a href="#sec-44">典型使用方案</a></li><li><a href="#sec-50">排障</a></li><li><a href="#sec-52">验收清单</a></li><li><a href="#sec-54">代码依据</a></li></ol>
+  <div class="quick">
+    <strong>最短路径</strong><br>
+    Web：登录 → 提交仓库 / 预算 / 超时 → 看事件 → 打开项目 → 下载胶囊<br>
+    CLI：analyze → resurrect → verify / replay<br>
+    API：创建项目 → resurrect → SSE → 下载胶囊
+  </div>
+</section>
+<p>这份方案按“拿到一个仓库之后怎么用”来写。先选入口，再按步骤提交、观察、检查、下载；最后给出团队和 CI 的落地方式。</p>
+<hr>
+<h2 id="sec-2">1. 先选入口</h2>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">场景</th><th style="text-align:left">入口</th><th style="text-align:left">适合谁</th><th style="text-align:left">产出</th></tr></thead><tbody><tr><td style="text-align:left">第一次体验</td><td style="text-align:left">Web 控制台 <code>/login</code></td><td style="text-align:left">不写代码的使用者</td><td style="text-align:left">任务、报告、胶囊</td></tr><tr><td style="text-align:left">本机排查</td><td style="text-align:left">CLI <code>revive analyze</code> / <code>resurrect --local</code></td><td style="text-align:left">开发者</td><td style="text-align:left">环境基因、<code>.revive</code> 胶囊</td></tr><tr><td style="text-align:left">团队任务</td><td style="text-align:left">Web 控制台 + 共享控制面</td><td style="text-align:left">团队管理员、维护者</td><td style="text-align:left">可交接的任务与胶囊</td></tr><tr><td style="text-align:left">CI / 批处理</td><td style="text-align:left">REST API + API Key</td><td style="text-align:left">自动化脚本</td><td style="text-align:left">任务状态、胶囊文件</td></tr><tr><td style="text-align:left">桌面使用</td><td style="text-align:left">Electron 桌面端</td><td style="text-align:left">Windows 用户</td><td style="text-align:left">同 Web 控制台</td></tr></tbody></table></div>
+<p>Web 和桌面端不需要在本机安装 Docker；Docker 只用于执行侧。CLI 的 <code>--local</code> 模式需要 Docker，或在明确信任代码的前提下显式允许宿主执行。</p>
+<hr>
+<h2 id="sec-4">2. 使用前准备</h2>
+<h3 id="sec-5">2.1 账号与权限</h3>
+<ul><li>通过 <code>/login</code> 注册或登录。密码至少 8 位。</li><li>普通用户可以创建项目、提交任务、查看自己的任务和胶囊。</li><li>模型配置、维护开关、全局任务管理只有管理员可见。</li><li>第一个管理员需要先注册普通账号，再由部署者在数据库中提升角色：</li></ul>
+<pre class="code"><code class="language-sql">UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';</code></pre>
+<h3 id="sec-6">2.2 仓库要求</h3>
+<ul><li>Web 提交只接受公开 GitHub 仓库，格式为 <code>https://github.com/owner/repo</code>。</li><li>默认仓库大小上限 200 MB，可在部署时调整。</li><li>代码必须是你拥有分析、构建和运行授权的项目。</li><li>仓库里最好有依赖清单、构建脚本或测试；没有测试也能跑，但行为比较会缺少基线。</li></ul>
+<h3 id="sec-7">2.3 默认配额</h3>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">项目</th><th style="text-align:left">默认值</th><th style="text-align:left">调整变量</th></tr></thead><tbody><tr><td style="text-align:left">并发任务</td><td style="text-align:left">2</td><td style="text-align:left"><code>REVIVE_QUOTA__MAX_CONCURRENT_JOBS</code></td></tr><tr><td style="text-align:left">每日任务</td><td style="text-align:left">20</td><td style="text-align:left"><code>REVIVE_QUOTA__MAX_JOBS_PER_DAY</code></td></tr><tr><td style="text-align:left">仓库大小</td><td style="text-align:left">200 MB</td><td style="text-align:left"><code>REVIVE_QUOTA__MAX_REPO_MB</code></td></tr><tr><td style="text-align:left">单任务预算</td><td style="text-align:left">页面默认 5 USD，接口上限 1000</td><td style="text-align:left">提交时填写</td></tr><tr><td style="text-align:left">单任务超时</td><td style="text-align:left">页面默认 60 分钟，接口上限 86400 秒</td><td style="text-align:left">提交时填写</td></tr><tr><td style="text-align:left">胶囊大小</td><td style="text-align:left">64 MB</td><td style="text-align:left"><code>REVIVE_HTTP__MAX_CAPSULE_BYTES</code></td></tr><tr><td style="text-align:left">JSON 请求体</td><td style="text-align:left">2 MB</td><td style="text-align:left"><code>REVIVE_HTTP__MAX_REQUEST_BYTES</code></td></tr><tr><td style="text-align:left">登录失败锁定</td><td style="text-align:left">5 次 / 15 分钟</td><td style="text-align:left"><code>REVIVE_RATE__LOGIN_FAILURE_LIMIT</code></td></tr><tr><td style="text-align:left">Access Token</td><td style="text-align:left">15 分钟</td><td style="text-align:left"><code>REVIVE_JWT__ACCESS_MINUTES</code></td></tr><tr><td style="text-align:left">Refresh Token</td><td style="text-align:left">7 天</td><td style="text-align:left"><code>REVIVE_JWT__REFRESH_DAYS</code></td></tr><tr><td style="text-align:left">API Key</td><td style="text-align:left">90 天</td><td style="text-align:left"><code>REVIVE_API_KEY__TTL_DAYS</code></td></tr></tbody></table></div>
+<hr>
+<h2 id="sec-9">3. Web 控制台完整流程</h2>
+<h3 id="sec-10">3.1 登录</h3>
+<ol><li>打开 <code>https://&lt;你的域名&gt;/login</code>，本地开发通常是 <code>http://127.0.0.1:3000/login</code>。</li><li>没有账号时切换到“注册”，填写邮箱和密码。</li><li>登录成功后进入 <code>/</code> 总览页。右上角显示“控制面在线”才表示 API 可达。</li><li>如果控制面离线，先检查设置页里的 API 地址，或确认 <code>/healthz</code> 可访问。</li></ol>
+<p>访问令牌和刷新令牌只放在当前标签页的 <code>sessionStorage</code>，关闭标签页即失效；控制台不会把令牌写进 URL。</p>
+<h3 id="sec-11">3.2 提交一次复生任务</h3>
+<p>在总览页的“提交复生任务”表单里：</p>
+<ol><li><strong>GitHub 仓库地址</strong>：填写 <code>https://github.com/owner/repo</code>。</li><li><strong>预算上限（USD）</strong>：默认 <code>5</code>，按任务填写。</li><li><strong>超时（分钟）</strong>：默认 <code>60</code>。</li><li>点击“提交复生”。</li></ol>
+<p>提交后系统会做两件事：先创建项目，再创建任务。页面跳转到 <code>/jobs/&lt;job_id&gt;</code>。</p>
+<p>常见返回：</p>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">情况</th><th style="text-align:left">页面表现</th><th style="text-align:left">处理</th></tr></thead><tbody><tr><td style="text-align:left">仓库地址格式不对</td><td style="text-align:left">输入框下方提示</td><td style="text-align:left">改成 <code>https://github.com/owner/repo</code></td></tr><tr><td style="text-align:left">项目已存在（409）</td><td style="text-align:left">提示“项目已存在”</td><td style="text-align:left">点“为该项目新建任务”，或“查看项目历史”</td></tr><tr><td style="text-align:left">并发或每日配额用尽（429）</td><td style="text-align:left">显示配额提示和倒计时</td><td style="text-align:left">等 <code>Retry-After</code> 或次日再提交</td></tr><tr><td style="text-align:left">仓库超过大小上限（413）</td><td style="text-align:left">提示仓库过大</td><td style="text-align:left">换更小的仓库，或由管理员调高上限</td></tr><tr><td style="text-align:left">控制面维护中（503）</td><td style="text-align:left">提示暂停接单</td><td style="text-align:left">等维护结束</td></tr></tbody></table></div>
+<h3 id="sec-12">3.3 观察任务</h3>
+<p>任务页 <code>/jobs/&lt;job_id&gt;</code> 会自动订阅 SSE：</p>
+<pre class="code"><code class="language-text">GET /api/v1/jobs/{job_id}/events/stream</code></pre>
+<p>页面会显示：</p>
+<ul><li>当前任务状态：<code>queued</code>、<code>running</code>、<code>succeeded</code>、<code>failed</code>、<code>cancelled</code>。</li><li>已接收事件数、当前事件类型、创建时间、结束时间。</li><li>事件时间线；SSE 断线时自动重连，超过重试次数会降级为每 5 秒轮询。</li><li>“刷新任务资源”“取消任务”“打开项目”“立即重连”。</li></ul>
+<p>常见事件：</p>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">事件</th><th style="text-align:left">含义</th></tr></thead><tbody><tr><td style="text-align:left"><code>job.queued</code></td><td style="text-align:left">任务已入队</td></tr><tr><td style="text-align:left"><code>archaeology.started</code></td><td style="text-align:left">开始环境考古</td></tr><tr><td style="text-align:left"><code>env.inferred</code></td><td style="text-align:left">环境基因已推断</td></tr><tr><td style="text-align:left"><code>sandbox.created</code></td><td style="text-align:left">沙箱工作区已创建</td></tr><tr><td style="text-align:left"><code>behavior.compared</code></td><td style="text-align:left">行为比较完成或记录缺失</td></tr><tr><td style="text-align:left"><code>score.computed</code></td><td style="text-align:left">评分完成</td></tr><tr><td style="text-align:left"><code>capsule.created</code></td><td style="text-align:left">胶囊已生成</td></tr><tr><td style="text-align:left"><code>job.succeeded</code></td><td style="text-align:left">任务终态：成功</td></tr><tr><td style="text-align:left"><code>job.failed</code></td><td style="text-align:left">任务终态：失败</td></tr></tbody></table></div>
+<p>任务成功后会显示“查看复生评分”和“打开胶囊”两个入口。</p>
+<h3 id="sec-13">3.4 查看项目材料</h3>
+<p>任务页点“打开项目”进入 <code>/projects/&lt;project_id&gt;</code>。项目页按标签拆开：</p>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">标签</th><th style="text-align:left">路径</th><th style="text-align:left">用途</th></tr></thead><tbody><tr><td style="text-align:left">总览</td><td style="text-align:left"><code>/projects/{id}</code></td><td style="text-align:left">仓库、状态、最近任务、评分概览</td></tr><tr><td style="text-align:left">环境基因</td><td style="text-align:left"><code>/projects/{id}/genome</code></td><td style="text-align:left">Python、OS、依赖、置信度</td></tr><tr><td style="text-align:left">证据</td><td style="text-align:left"><code>/projects/{id}/evidence</code></td><td style="text-align:left">依赖、CI、Dockerfile 等来源</td></tr><tr><td style="text-align:left">构建</td><td style="text-align:left"><code>/projects/{id}/builds</code></td><td style="text-align:left">构建尝试与失败位置</td></tr><tr><td style="text-align:left">补丁</td><td style="text-align:left"><code>/projects/{id}/patches</code></td><td style="text-align:left">修复 diff、文件范围、行数</td></tr><tr><td style="text-align:left">行为</td><td style="text-align:left"><code>/projects/{id}/behavior</code></td><td style="text-align:left">基线比较与行为指纹</td></tr><tr><td style="text-align:left">报告</td><td style="text-align:left"><code>/projects/{id}/report</code></td><td style="text-align:left">评分、报告与结论</td></tr><tr><td style="text-align:left">胶囊</td><td style="text-align:left"><code>/projects/{id}/capsules</code></td><td style="text-align:left">该项目生成的胶囊列表</td></tr></tbody></table></div>
+<p>建议顺序：先看环境基因和证据，确认环境是否可信；再看构建和补丁，确认修改范围；最后看行为与评分，确认结果依据。</p>
+<h3 id="sec-14">3.5 下载胶囊</h3>
+<p>在 <code>/capsules/&lt;capsule_id&gt;</code> 或项目胶囊列表里：</p>
+<ol><li>查看 manifest：<code>format</code>、<code>source.repo</code>、<code>source.commit</code>、<code>genome_ref</code>、<code>behavior.compatibility</code>、<code>sbom_digest</code>。</li><li>点“下载 .revive”。</li><li>浏览器通过 API 的 presigned 302 下载，文件名为 <code>&lt;capsule_id&gt;.revive</code>。</li></ol>
+<p>胶囊通常包含 manifest、Genome、依赖记录、Dockerfile、补丁、行为计划与指纹、SBOM、provenance、source.tar 等条目。具体条目以 manifest 为准。</p>
+<h3 id="sec-15">3.6 设置页</h3>
+<p><code>/settings</code> 包括：</p>
+<ul><li><strong>控制面地址</strong>：浏览器版保存到 localStorage，桌面版交给 Electron 主进程持久化。</li><li><strong>我的资料与配额</strong>：邮箱、角色、并发上限、每日上限。</li><li><strong>API Key</strong>：新建时明文只显示一次；列表只显示前缀；可以删除。</li><li><strong>外观</strong>：壁纸只保存在本机，不上传服务端。</li><li><strong>模型提供方</strong>：只有管理员可改；保存后由 worker 在下一个任务读取。</li><li><strong>安全说明</strong>：令牌、密钥、壁纸的存储边界。</li></ul>
+<p>模型提供方支持：</p>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">提供方</th><th style="text-align:left">用途</th><th style="text-align:left">必填</th></tr></thead><tbody><tr><td style="text-align:left"><code>fake</code></td><td style="text-align:left">本地演示，不联网</td><td style="text-align:left">无</td></tr><tr><td style="text-align:left"><code>openai</code></td><td style="text-align:left">OpenAI 兼容接口</td><td style="text-align:left">模型名、API Key</td></tr><tr><td style="text-align:left"><code>anthropic</code></td><td style="text-align:left">Anthropic 接口</td><td style="text-align:left">模型名、API Key</td></tr><tr><td style="text-align:left"><code>custom</code></td><td style="text-align:left">OpenAI 兼容网关</td><td style="text-align:left">Base URL、模型名、API Key</td></tr></tbody></table></div>
+<p>“推理强度”可选 <code>low</code> / <code>medium</code> / <code>high</code>；“测试连接”会发起一次真实探测。API Key 只回显末四位，完整值不再返回。</p>
+<hr>
+<h2 id="sec-17">4. CLI 使用</h2>
+<h3 id="sec-18">4.1 入口</h3>
+<pre class="code"><code class="language-bash"># 在仓库根目录
+uv run revive --help
+# Windows 虚拟环境
+.venv/Scripts/revive.exe --help</code></pre>
+<p>CLI 命令：</p>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">命令</th><th style="text-align:left">用途</th></tr></thead><tbody><tr><td style="text-align:left"><code>revive analyze</code></td><td style="text-align:left">只做环境考古，输出环境基因</td></tr><tr><td style="text-align:left"><code>revive resurrect</code></td><td style="text-align:left">本地复生，或提交到控制面</td></tr><tr><td style="text-align:left"><code>revive verify</code></td><td style="text-align:left">检查胶囊结构和摘要</td></tr><tr><td style="text-align:left"><code>revive replay</code></td><td style="text-align:left">进入胶囊工作区执行命令</td></tr><tr><td style="text-align:left"><code>revive login</code></td><td style="text-align:left">保存控制面凭据</td></tr><tr><td style="text-align:left"><code>revive jobs ls</code> / <code>jobs get</code></td><td style="text-align:left">查看服务端任务</td></tr><tr><td style="text-align:left"><code>revive download</code></td><td style="text-align:left">下载服务端胶囊</td></tr></tbody></table></div>
+<h3 id="sec-19">4.2 只做环境考古</h3>
+<pre class="code"><code class="language-bash">uv run revive analyze https://github.com/owner/repo --out genome.json
+# 不查询 PyPI 历史版本
+uv run revive analyze ./local-repo --offline</code></pre>
+<p>输出包括 Python 版本、OS、依赖、证据来源和 <code>overall_confidence</code>。置信度低于 <code>0.4</code> 时命令以退出码 3 结束，表示证据不足。</p>
+<h3 id="sec-20">4.3 本地复生</h3>
+<pre class="code"><code class="language-bash">uv run revive resurrect ./local-repo \
+  --local \
+  --budget-usd 5 \
+  --timeout 600 \
+  --out demo.revive</code></pre>
+<p>可用参数：</p>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">参数</th><th style="text-align:left">说明</th></tr></thead><tbody><tr><td style="text-align:left"><code>--local</code></td><td style="text-align:left">使用本地流水线</td></tr><tr><td style="text-align:left"><code>--budget-usd</code></td><td style="text-align:left">LLM 预算上限</td></tr><tr><td style="text-align:left"><code>--timeout</code></td><td style="text-align:left">流水线超时秒数</td></tr><tr><td style="text-align:left"><code>--out</code></td><td style="text-align:left">输出 <code>.revive</code> 路径</td></tr><tr><td style="text-align:left"><code>--work-root</code></td><td style="text-align:left">沙箱工作目录</td></tr><tr><td style="text-align:left"><code>--keep-sandbox</code></td><td style="text-align:left">保留沙箱工作区，便于排查</td></tr><tr><td style="text-align:left"><code>--allow-host-execution</code></td><td style="text-align:left">Docker 不可用时允许在宿主执行目标代码</td></tr></tbody></table></div>
+<p><code>--allow-host-execution</code> 只应对你信任的代码使用。生产环境应使用 Docker 执行端口，不要用宿主执行替代隔离。</p>
+<h3 id="sec-21">4.4 提交到控制面</h3>
+<p>先保存凭据：</p>
+<pre class="code"><code class="language-bash">uv run revive login \
+  --server https://revive.example.com \
+  --token "$REVIVE_ACCESS_TOKEN"
+# 或用邮箱密码
+uv run revive login --server https://revive.example.com --email you@example.com --password '...'</code></pre>
+<p>提交并实时看事件：</p>
+<pre class="code"><code class="language-bash">uv run revive resurrect https://github.com/owner/repo \
+  --server https://revive.example.com \
+  --budget-usd 5 \
+  --timeout 3600</code></pre>
+<p>任务结束后：</p>
+<pre class="code"><code class="language-bash">uv run revive jobs ls
+uv run revive jobs get &lt;job_id&gt;
+uv run revive download &lt;job_id&gt; -o capsule.revive</code></pre>
+<p><code>REVIVE_SERVER_URL</code> 可以替代重复的 <code>--server</code>。凭据保存在系统钥匙串，或权限为 0600 的回退文件。</p>
+<h3 id="sec-22">4.5 检查与重放胶囊</h3>
+<pre class="code"><code class="language-bash">uv run revive verify capsule.revive
+uv run revive verify capsule.revive --json
+uv run revive replay capsule.revive -- python -m pytest -q</code></pre>
+<ul><li><code>verify</code> 输出 manifest、摘要和可用的重建检查报告，并按报告中的 <code>exit_code</code> 退出。没有可用重建器时只完成结构与摘要检查。</li><li><code>replay</code> 展开胶囊工作区并执行你给出的命令；需要 Docker，或显式加 <code>--allow-host-execution</code> 在宿主执行。</li><li>这两个命令都不会修改原胶囊。</li></ul>
+<h3 id="sec-23">4.6 CLI 退出码</h3>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">退出码</th><th style="text-align:left">含义</th></tr></thead><tbody><tr><td style="text-align:left"><code>0</code></td><td style="text-align:left">成功</td></tr><tr><td style="text-align:left"><code>1</code></td><td style="text-align:left">任务失败，或本地复生状态为 <code>dead</code></td></tr><tr><td style="text-align:left"><code>2</code></td><td style="text-align:left">参数、凭据、网络、Docker 或执行错误</td></tr><tr><td style="text-align:left"><code>3</code></td><td style="text-align:left">环境证据不足（<code>analyze</code> 置信度低于 0.4）</td></tr></tbody></table></div>
+<p><code>verify</code> 的退出码来自报告，可能是 <code>0</code> 或 <code>2</code>；以报告为准。</p>
+<hr>
+<h2 id="sec-25">5. API 与 CI</h2>
+<h3 id="sec-26">5.1 认证</h3>
+<p>两种方式，任选其一：</p>
+<pre class="code"><code class="language-http">Authorization: Bearer &lt;access_token&gt;</code></pre>
+<p>或：</p>
+<pre class="code"><code class="language-http">X-Revive-Key: rev_api_key_...</code></pre>
+<p>API Key 在设置页创建，明文只返回一次。不要把它写进仓库、URL 或日志。</p>
+<h3 id="sec-27">5.2 创建项目并提交任务</h3>
+<pre class="code"><code class="language-bash">BASE=https://revive.example.com
+TOKEN=...                     # 登录后的 access_token
+REPO=https://github.com/owner/repo
+
+PROJECT=$(curl -fsS -X POST "$BASE/api/v1/projects" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"repo_url\":\"$REPO\"}")
+PID=$(printf '%s' "$PROJECT" | python -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+
+JOB=$(curl -fsS -X POST "$BASE/api/v1/projects/$PID/resurrect" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"budget_usd":5,"timeout_seconds":3600}')
+JID=$(printf '%s' "$JOB" | python -c 'import json,sys; print(json.load(sys.stdin)["job_id"])')</code></pre>
+<p>如果项目已存在，<code>POST /projects</code> 返回 409，并带 <code>existing_id</code>；直接用这个 id 提交新任务。</p>
+<h3 id="sec-28">5.3 订阅事件</h3>
+<pre class="code"><code class="language-bash">curl -N -H "Authorization: Bearer $TOKEN" \
+  "$BASE/api/v1/jobs/$JID/events/stream"</code></pre>
+<p>SSE 支持 <code>Last-Event-ID</code>，断线重连时可从上次事件继续。没有 SSE 客户端时，也可以轮询：</p>
+<pre class="code"><code class="language-bash">curl -fsS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/jobs/$JID"</code></pre>
+<h3 id="sec-29">5.4 取胶囊并下载</h3>
+<pre class="code"><code class="language-bash">CAPSULES=$(curl -fsS -H "Authorization: Bearer $TOKEN" \
+  "$BASE/api/v1/projects/$PID/capsules?limit=1")
+CID=$(printf '%s' "$CAPSULES" | python -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])')
+
+# -L 跟随 presigned 302
+curl -fL -H "Authorization: Bearer $TOKEN" \
+  -o capsule.revive "$BASE/api/v1/capsules/$CID/download"</code></pre>
+<p>取消任务：</p>
+<pre class="code"><code class="language-bash">curl -fsS -X POST -H "Authorization: Bearer $TOKEN" \
+  "$BASE/api/v1/jobs/$JID/cancel"</code></pre>
+<h3 id="sec-30">5.5 CI 示例</h3>
+<pre class="code"><code class="language-bash">#!/usr/bin/env bash
+set -euo pipefail
+
+BASE="${REVIVE_SERVER_URL:?}"
+KEY="${REVIVE_API_KEY:?}"
+REPO="${1:?usage: ci-resurrect.sh &lt;github-repo-url&gt;}"
+
+PROJECT=$(curl -fsS -X POST "$BASE/api/v1/projects" \
+  -H "X-Revive-Key: $KEY" -H 'Content-Type: application/json' \
+  -d "{\"repo_url\":\"$REPO\"}")
+PID=$(printf '%s' "$PROJECT" | python -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+
+JOB=$(curl -fsS -X POST "$BASE/api/v1/projects/$PID/resurrect" \
+  -H "X-Revive-Key: $KEY" -H 'Content-Type: application/json' \
+  -d '{"budget_usd":5,"timeout_seconds":3600}')
+JID=$(printf '%s' "$JOB" | python -c 'import json,sys; print(json.load(sys.stdin)["job_id"])')
+
+for _ in $(seq 1 720); do
+  STATE=$(curl -fsS -H "X-Revive-Key: $KEY" "$BASE/api/v1/jobs/$JID")
+  STATUS=$(printf '%s' "$STATE" | python -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+  case "$STATUS" in
+    succeeded) break ;;
+    failed|cancelled) echo "job $STATUS" &gt;&amp;2; exit 1 ;;
+  esac
+  sleep 5
+done
+
+CAPSULES=$(curl -fsS -H "X-Revive-Key: $KEY" \
+  "$BASE/api/v1/projects/$PID/capsules?limit=1")
+CID=$(printf '%s' "$CAPSULES" | python -c 'import json,sys; print(json.load(sys.stdin)["items"][0]["id"])')
+curl -fL -H "X-Revive-Key: $KEY" -o capsule.revive \
+  "$BASE/api/v1/capsules/$CID/download"</code></pre>
+<h3 id="sec-31">5.6 常见 HTTP 状态</h3>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">状态</th><th style="text-align:left">含义</th><th style="text-align:left">处理</th></tr></thead><tbody><tr><td style="text-align:left"><code>400</code></td><td style="text-align:left">请求字段无效</td><td style="text-align:left">检查 JSON 和字段范围</td></tr><tr><td style="text-align:left"><code>401</code></td><td style="text-align:left">未认证或令牌过期</td><td style="text-align:left">重新登录，或刷新令牌</td></tr><tr><td style="text-align:left"><code>403</code></td><td style="text-align:left">权限不足（如非管理员）</td><td style="text-align:left">换管理员账号</td></tr><tr><td style="text-align:left"><code>404</code></td><td style="text-align:left">项目、任务或胶囊不存在</td><td style="text-align:left">检查 id</td></tr><tr><td style="text-align:left"><code>409</code></td><td style="text-align:left">项目已存在</td><td style="text-align:left">使用响应里的 <code>existing_id</code></td></tr><tr><td style="text-align:left"><code>413</code></td><td style="text-align:left">仓库或请求体过大</td><td style="text-align:left">换仓库或调高上限</td></tr><tr><td style="text-align:left"><code>429</code></td><td style="text-align:left">并发、每日或登录频率超限</td><td style="text-align:left">按 <code>Retry-After</code> 等待</td></tr><tr><td style="text-align:left"><code>503</code></td><td style="text-align:left">维护中</td><td style="text-align:left">等维护结束</td></tr></tbody></table></div>
+<hr>
+<h2 id="sec-33">6. 生产部署</h2>
+<h3 id="sec-34">6.1 拓扑</h3>
+<pre class="code"><code class="language-text">Caddy (443 / TLS)
+  ├─ /api/*      → FastAPI
+  ├─ /healthz    → FastAPI
+  ├─ /readyz     → FastAPI
+  └─ 其他         → Web 静态控制台
+
+FastAPI → PostgreSQL / Redis / S3
+Celery worker → Docker sandbox（唯一执行用户代码的进程）
+Celery beat → 清理孤儿沙箱</code></pre>
+<p>API 不执行用户代码。生产环境的 worker 挂载 Docker socket，等同于宿主 root 权限，必须部署在专用、隔离的主机上。</p>
+<h3 id="sec-35">6.2 首次部署</h3>
+<pre class="code"><code class="language-bash"># 1. 生产应用配置
+cp infra/envs/revive.prod.env.template infra/envs/revive.prod.env
+# 用 secret manager 填入 JWT、worker token、数据库/Redis 口令、S3 凭据
+
+# 2. Compose 配置
+cp infra/envs/compose.env.template .env
+# 填入镜像名、digest、域名、Docker GID、数据库/Redis 口令
+
+# 3. 静态校验、拉取、启动
+docker compose --env-file .env -f infra/compose/prod.docker-compose.yml config --quiet
+docker compose --env-file .env -f infra/compose/prod.docker-compose.yml pull
+docker compose --env-file .env -f infra/compose/prod.docker-compose.yml up -d
+docker compose --env-file .env -f infra/compose/prod.docker-compose.yml ps</code></pre>
+<p><code>REVIVE_ENV=prod</code> 是 fail-closed 的：缺少 <code>DATABASE_URL</code>、<code>REDIS_URL</code>、<code>S3_*</code> 或持久化适配器时 API 拒绝启动。</p>
+<h3 id="sec-36">6.3 首个管理员</h3>
+<ol><li>打开 <code>/login</code> 注册普通账号。</li><li>在 PostgreSQL 中提升角色：</li></ol>
+<pre class="code"><code class="language-bash">docker compose --env-file .env -f infra/compose/prod.docker-compose.yml \
+  exec postgres psql -U revive -d revive \
+  -c "UPDATE users SET role='admin' WHERE email='admin@example.com';"</code></pre>
+<h3 id="sec-37">6.4 健康与就绪</h3>
+<pre class="code"><code class="language-bash">curl -fsS https://&lt;你的域名&gt;/healthz
+curl -fsS https://&lt;你的域名&gt;/readyz</code></pre>
+<ul><li><code>/healthz</code> 只表示 API 进程存活，容器健康检查用它。</li><li><code>/readyz</code> 检查 PostgreSQL、Redis 和对象存储；负载均衡或编排系统用它决定是否接流量。</li><li><code>/metrics</code> 是 Prometheus 文本，只在内网暴露，Caddy 不代理。</li></ul>
+<h3 id="sec-38">6.5 备份与恢复</h3>
+<pre class="code"><code class="language-bash">BACKUP_DIR=/backups \
+DATABASE_URL=postgresql://... \
+bash infra/backup/pg-backup.sh
+
+BACKUP_FILE=/backups/revive-*.sql.gz \
+DATABASE_URL=postgresql://... \
+bash infra/backup/pg-restore.sh</code></pre>
+<p>备份必须复制到异地或独立账号/卷，不能与生产同机同卷。S3 开启版本控制，并定期做恢复演练。恢复后抽查项目、任务、胶囊和 <code>revive verify</code>。</p>
+<h3 id="sec-39">6.6 升级与回滚</h3>
+<ol><li>打 tag，发布 API、worker、Web 三个镜像到 GHCR；Trivy 扫描和 CycloneDX SBOM 作为发布门禁。</li><li>把新镜像和依赖镜像固定到 digest，更新 <code>.env</code> 中的 <code>*_DIGEST</code>。</li><li><code>docker compose pull</code>、<code>up -d</code>；migrate 服务会先执行 Alembic 到 head。</li><li>保留上一组 digest；回滚时切回旧 digest，数据库按备份/迁移策略恢复。</li><li>升级后检查 <code>/readyz</code>、worker 日志、beat 清理任务、胶囊下载和一次完整任务。</li></ol>
+<h3 id="sec-40">6.7 安全边界</h3>
+<ul><li>Caddy 是唯一入口，只暴露 80/443；API 端口不要直接发布。</li><li>worker 主机专用，限制 operator 权限；Docker socket 不是多租户隔离边界。</li><li><code>REVIVE_SECRETS__KEY</code> 在 API 和 worker 之间保持一致；轮换会导致已保存的模型密钥不可读。</li><li>API Key 只显示一次，按用户撤销；令牌不要写进 URL、日志或仓库。</li><li>模型密钥只写入服务端运行时配置，接口只回显末四位。</li></ul>
+<hr>
+<h2 id="sec-42">7. 任务内部限制</h2>
+<p>这些限制决定了一次任务最多能修到什么程度，提交前应知道：</p>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">限制</th><th style="text-align:left">值</th></tr></thead><tbody><tr><td style="text-align:left">单次补丁文件数</td><td style="text-align:left">最多 10 个文件</td></tr><tr><td style="text-align:left">单次补丁行数</td><td style="text-align:left">最多 300 行增删</td></tr><tr><td style="text-align:left">构建尝试</td><td style="text-align:left">最多 5 次</td></tr><tr><td style="text-align:left">修复调用</td><td style="text-align:left">最多 4 次</td></tr><tr><td style="text-align:left">测试文件</td><td style="text-align:left">禁止修改</td></tr><tr><td style="text-align:left">构建失败</td><td style="text-align:left">恢复上一版快照</td></tr><tr><td style="text-align:left">沙箱</td><td style="text-align:left">非 root、只读根文件系统、运行时禁网、资源限制</td></tr></tbody></table></div>
+<p>补丁范围按实际 diff 计数，不是按模型自述。测试失败会终止自动流程，不会无限修复。</p>
+<hr>
+<h2 id="sec-44">8. 典型使用方案</h2>
+<h3 id="sec-45">8.1 个人第一次使用</h3>
+<ol><li>打开 Web，注册登录。</li><li>提交一个 200 MB 以内的公开 Python 仓库。</li><li>预算 5 USD、超时 60 分钟。</li><li>在任务页看 <code>env.inferred</code>、<code>sandbox.created</code>、<code>capsule.created</code>。</li><li>打开项目页，先看环境基因和证据，再看构建、补丁、行为、报告。</li><li>下载 <code>.revive</code>，用 <code>revive verify</code> 检查结构。</li></ol>
+<h3 id="sec-46">8.2 团队接入</h3>
+<ol><li>管理员在设置页配置模型提供方并点“测试连接”。</li><li>为 CI 单独创建 API Key，设置备注，按需撤销。</li><li>根据团队规模设置并发和每日配额；生产 worker 放独立主机。</li><li>约定胶囊命名和归档位置；发布前跑一次备份恢复演练。</li><li>用 <code>/readyz</code> 接负载均衡，用 <code>/metrics</code> 接监控。</li></ol>
+<h3 id="sec-47">8.3 CI 自动化</h3>
+<ol><li>在 CI secret 中保存 <code>REVIVE_SERVER_URL</code> 和 <code>REVIVE_API_KEY</code>。</li><li>按第 5.5 节脚本创建项目、提交任务、轮询终态。</li><li>成功时下载 <code>capsule.revive</code> 作为构建产物；失败时保留任务 id 和事件日志。</li><li>不要把 API Key 打印到日志；不要把 <code>.revive</code> 当唯一备份，数据库和 S3 仍要备份。</li></ol>
+<h3 id="sec-48">8.4 研究与归档</h3>
+<ol><li><code>revive analyze ./repo --offline --out genome.json</code> 先固定环境基因。</li><li><code>revive resurrect ./repo --local --out archive.revive</code> 生成胶囊。</li><li><code>revive verify archive.revive --json</code> 保存校验报告。</li><li><code>revive replay archive.revive -- &lt;命令&gt;</code> 在胶囊工作区复跑关键命令。</li><li>把 genome、胶囊、校验报告和命令记录一起归档。</li></ol>
+<hr>
+<h2 id="sec-50">9. 排障</h2>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">现象</th><th style="text-align:left">优先检查</th><th style="text-align:left">处理</th></tr></thead><tbody><tr><td style="text-align:left">控制面离线</td><td style="text-align:left">API 地址、<code>/healthz</code></td><td style="text-align:left">改设置页地址，或启动 API</td></tr><tr><td style="text-align:left">登录后立刻 401</td><td style="text-align:left">标签页是否关闭、令牌是否过期</td><td style="text-align:left">重新登录；不要跨标签复制 sessionStorage</td></tr><tr><td style="text-align:left">403</td><td style="text-align:left">当前账号角色</td><td style="text-align:left">模型/维护接口需要管理员</td></tr><tr><td style="text-align:left">409</td><td style="text-align:left">项目是否已存在</td><td style="text-align:left">用 <code>existing_id</code> 新建任务</td></tr><tr><td style="text-align:left">413</td><td style="text-align:left">仓库大小</td><td style="text-align:left">换小仓库或调高 <code>MAX_REPO_MB</code></td></tr><tr><td style="text-align:left">429</td><td style="text-align:left">并发/每日配额、登录失败</td><td style="text-align:left">按 <code>Retry-After</code> 等待；管理员调配额</td></tr><tr><td style="text-align:left">503</td><td style="text-align:left">维护开关</td><td style="text-align:left">等维护结束</td></tr><tr><td style="text-align:left">任务失败</td><td style="text-align:left">任务事件、构建日志、补丁</td><td style="text-align:left">看失败阶段；不要只看“成功/失败”</td></tr><tr><td style="text-align:left">SSE 断开</td><td style="text-align:left">网络/代理</td><td style="text-align:left">页面会重连；降级后每 5 秒轮询</td></tr><tr><td style="text-align:left">下载 404</td><td style="text-align:left">胶囊是否生成</td><td style="text-align:left">任务未成功或胶囊未上传时没有下载</td></tr><tr><td style="text-align:left">本地 <code>resurrect</code> 报 Docker 不可用</td><td style="text-align:left">Docker daemon</td><td style="text-align:left">启动 Docker；或只在可信代码上加 <code>--allow-host-execution</code></td></tr><tr><td style="text-align:left">模型测试失败</td><td style="text-align:left">Base URL、模型名、Key</td><td style="text-align:left"><code>custom</code> 必须填 Base URL；检查网关兼容性</td></tr><tr><td style="text-align:left">胶囊 verify 非 0</td><td style="text-align:left">报告中的检查项</td><td style="text-align:left">看 manifest/digests/rebuild 哪一项失败</td></tr></tbody></table></div>
+<hr>
+<h2 id="sec-52">10. 验收清单</h2>
+<ul><li><span class="checkbox">☐</span> <code>/healthz</code> 返回 200。</li><li><span class="checkbox">☐</span> <code>/readyz</code> 返回 200，且 PostgreSQL、Redis、对象存储均为就绪。</li><li><span class="checkbox">☐</span> 能注册、登录、退出；刷新令牌可用。</li><li><span class="checkbox">☐</span> 提交公开 GitHub 仓库后任务进入 <code>queued</code>/<code>running</code>。</li><li><span class="checkbox">☐</span> 任务页能收到 SSE 事件；断线后能重连或降级轮询。</li><li><span class="checkbox">☐</span> 项目页能看到环境基因、证据、构建、补丁、行为、报告。</li><li><span class="checkbox">☐</span> 任务成功后能打开胶囊并下载 <code>.revive</code>。</li><li><span class="checkbox">☐</span> <code>revive verify</code> 能输出报告；<code>revive replay</code> 能执行指定命令。</li><li><span class="checkbox">☐</span> 管理员能保存并测试模型配置；非管理员看不到模型配置。</li><li><span class="checkbox">☐</span> 配额、维护开关、API Key 撤销生效。</li><li><span class="checkbox">☐</span> 备份脚本能备份并恢复到临时库。</li><li><span class="checkbox">☐</span> 生产 Compose 能通过 <code>config --quiet</code>，Caddy 只暴露 80/443。</li></ul>
+<hr>
+<h2 id="sec-54">11. 代码依据</h2>
+<div class="table-wrap"><table><thead><tr><th style="text-align:left">功能</th><th style="text-align:left">位置</th></tr></thead><tbody><tr><td style="text-align:left">Web 提交表单</td><td style="text-align:left"><code>apps/web/src/features/submit/ResurrectForm.tsx</code></td></tr><tr><td style="text-align:left">Web 任务页与 SSE</td><td style="text-align:left"><code>apps/web/app/jobs/[id]/ClientPage.tsx</code></td></tr><tr><td style="text-align:left">Web 胶囊下载</td><td style="text-align:left"><code>apps/web/app/capsules/[id]/ClientPage.tsx</code></td></tr><tr><td style="text-align:left">Web 设置与模型配置</td><td style="text-align:left"><code>apps/web/app/settings/page.tsx</code>、<code>apps/web/src/features/settings/ModelProviderSection.tsx</code></td></tr><tr><td style="text-align:left">API 路由与任务提交</td><td style="text-align:left"><code>apps/api/src/revive_api/main.py</code></td></tr><tr><td style="text-align:left">配额与配置默认值</td><td style="text-align:left"><code>apps/api/src/revive_api/config.py</code></td></tr><tr><td style="text-align:left">任务执行</td><td style="text-align:left"><code>apps/api/src/revive_api/tasks/pipeline.py</code></td></tr><tr><td style="text-align:left">CLI 命令</td><td style="text-align:left"><code>cli/src/revive_cli/main.py</code></td></tr><tr><td style="text-align:left">CLI 服务端客户端</td><td style="text-align:left"><code>cli/src/revive_cli/client.py</code></td></tr><tr><td style="text-align:left">生产编排</td><td style="text-align:left"><code>infra/compose/prod.docker-compose.yml</code></td></tr><tr><td style="text-align:left">Caddy 路由</td><td style="text-align:left"><code>infra/compose/caddy/Caddyfile</code></td></tr><tr><td style="text-align:left">备份脚本</td><td style="text-align:left"><code>infra/backup/pg-backup.sh</code>、<code>infra/backup/pg-restore.sh</code></td></tr><tr><td style="text-align:left">部署与就绪说明</td><td style="text-align:left"><code>docs/production-readiness.md</code>、<code>docs/runbook-deploy.md</code></td></tr></tbody></table></div>
+</body>
+</html>

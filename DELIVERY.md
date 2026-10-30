@@ -9,7 +9,7 @@
 | 形态 | 位置 | 状态 |
 | --- | --- | --- |
 | Web 控制台（Next.js 静态导出，Software ICU） | `apps/web` | 已验证（typecheck / lint / build / OpenAPI 类型生成 / 登录注册浏览器实测） |
-| 桌面软件（Electron 壳 + 托盘/设置/静态服务） | `apps/desktop` | 已验证（`tsc` 编译）；安装包待沙箱外打包 |
+| 桌面软件（Electron 壳 + 托盘/设置/静态服务） | `apps/desktop` | 已验证（目录包生成，asar 含 `web/` 与独立 preload）；NSIS 安装包在本机被安装器自解包步骤阻断，需普通终端打包 |
 | CLI（analyze / resurrect / verify / replay / login / download / jobs） | `cli` | 已验证（`--help` 与命令注册） |
 | 后端控制面（FastAPI） | `apps/api` | 已验证（412 项测试；80 个操作/64 条路径） |
 | 核心引擎（考古、环境推断、沙箱、评分、胶囊） | `packages/core` | 已验证（单元/契约测试） |
@@ -19,7 +19,7 @@
 | 迁移 | `apps/api/alembic` | 已验证（链 0001→0004）；执行待真实 PG |
 | 可观测性 | `GET /metrics`、`infra/observability` | 已验证（Prometheus 文本） |
 
-规模：384 个受版本控制文件；Python ≈21.0k 行、TS/TSX ≈7.7k 行。
+规模：404 个受版本控制文件；Python ≈28.0k 行、TS/TSX ≈9.6k 行。
 
 ## 2. 生产架构（已实现的部分）
 
@@ -29,7 +29,7 @@ Browser / Desktop / CLI
         ▼
    API (FastAPI)  ── request-scoped SQLAlchemy UoW（成功 commit / 失败 rollback）
         │                 ├─ 认证：JWT access+refresh（旋转+重用检测）
-        │                 ├─ API Key（哈希校验，按用户查询/撤销）
+        │                 ├─ API Key（哈希校验，默认 90 天过期，按用户查询/撤销）
         │                 ├─ 配额/维护开关（runtime_settings 表，跨副本共享）
         │                 ├─ 就绪探针：postgres / redis / object_storage
         │                 └─ 指标：/metrics（内部，不进 OpenAPI）
@@ -46,10 +46,10 @@ Browser / Desktop / CLI
 
 | 门禁 | 命令 | 结果 |
 | --- | --- | --- |
-| 全量测试 | `.venv\Scripts\python.exe -m pytest -q` | **412 passed, 21 skipped**（skip 全部为 `requires_docker` 与本机不允许建符号链接的用例） |
+| 全量测试 | `.venv\Scripts\python.exe -m pytest -q` | **449 passed, 18 skipped**（skip 全部为 `requires_docker` 与本机不允许建符号链接的用例） |
 | Lint | `ruff check <PY_PATHS>` | All checks passed |
-| 格式 | `ruff format --check <PY_PATHS>` | 209 files already formatted |
-| 类型 | `mypy packages/core/src cli/src agents/src apps/api/src` | Success: 113 source files |
+| 格式 | `ruff format --check <PY_PATHS>` | 211 files already formatted |
+| 类型 | `mypy <SRC_PATHS>`（pyproject 已启用 strict） | Success: 114 source files |
 | Schema 契约 | `python tools/check_contracts.py` | OK (5 schemas, 10 fixtures) |
 | 红线规则 | `python tools/check_global_rules.py .` | OK（无密钥、修复上限完好） |
 | OpenAPI 漂移 | `pytest tests/unit/api/test_openapi_contract.py` | 快照 == 运行时（64 路径 / 80 操作） |
@@ -57,12 +57,14 @@ Browser / Desktop / CLI
 | 生产栈构造 | `pytest tests/unit/api/test_app_lifespan.py ...` | UoW/engine/事件/限流/存储装配正确 |
 | 对象存储往返 | `pytest tests/unit/api/test_capsule_storage_http.py` | 真实 HTTP PUT/GET/DELETE + SigV4 头 |
 | 就绪语义 | `pytest tests/unit/api/test_readiness_probes.py` | 200/403 就绪、503/不可达不就绪 |
-| 迁移链 | `python -m alembic -c apps/api/alembic.ini history` | `<base>→0001→0002→0003→0004 (head)` |
+| 迁移链 | `python -m alembic -c apps/api/alembic.ini history` | `<base>→0001→0002→0003→0004→0005 (head)` |
 | 前端类型 | `pnpm --filter web typecheck` | 通过 |
 | 前端 lint | `pnpm --filter web lint` | No ESLint warnings or errors |
 | 前端生产构建 | `pnpm --filter web build` | 通过（13 个路由、18 个静态页面，含 `/login`） |
 | 登录链路 | 本机 API + 静态控制台 + 浏览器 | 注册 → 控制台在线 → 退出登录，实测通过 |
 | 桌面壳编译 | `pnpm --filter desktop build` | 通过 |
+| 桌面目录包 | `pnpm --filter desktop dist:dir` | 通过；asar 内 `web/index.html` 与 `web/settings` 存在 |
+| 桌面静态导出 | `node apps/desktop/scripts/copy-web.mjs` | 通过（`apps/desktop/web` 生成，打包配置已包含） |
 | pre-commit | `python -m pre_commit run --all-files` | 6/6 hooks Passed |
 
 ## 4. 待沙箱外验证（必须跑完才算生产验收）
@@ -72,7 +74,8 @@ Browser / Desktop / CLI
 1. **Docker daemon 不可达**：`docker info` 报命名管道缺失 → 一切 `requires_docker` 用例 skip；
    镜像构建、Compose 运行、Postgres/Redis/MinIO 联调仍须在目标机或 CI 完成。Compose 静态解析
    （含新增的 beat 服务与 worker 的 `REVIVE_API_URL`）已用 `docker compose config` 校验。
-2. **Electron 安装包**仍需在可 fork 的普通终端执行 `pnpm --filter desktop dist`；壳的 `tsc` 已通过。
+2. **Electron 安装包**：`pnpm --filter desktop dist` 会先编译壳、复制 `apps/web/out` 到 `apps/desktop/web`，再交给 electron-builder。
+   本机目录包已生成并通过 asar 检查；NSIS 安装器在生成卸载器时会自执行安装包，本沙箱返回退出码 2/null，需在普通终端执行。
 
 请在普通终端 / CI 执行：
 
@@ -122,7 +125,8 @@ Web 首页冒烟。tag 触发的 `release.yml` 负责 GHCR 发布、Trivy 门禁
    Compose 已把 worker 的 `REVIVE_API_URL` 固定为内部 `http://api:8000`，胶囊上传依赖它。
 9. 建议设置 `REVIVE_LLM__JOB_BUDGET_USD`，并按宿主环境调整 `REVIVE_QUOTA__*`。
 10. 若需“构造即复现”的镜像，把 Dockerfile 切到 `uv sync --frozen` 并 digest 锁定基础镜像
-   （当前从 `pyproject.toml` 安装、基础镜像为 tag）。
+   （当前应用从 `pyproject.toml` 安装；沙箱基础镜像在 worker 启动时尝试解析 digest，
+   设置 `REVIVE_SANDBOX__REQUIRE_DIGEST=1` 可让解析失败时 fail-closed）。
 
 ## 6. 已知限制与取舍（诚实清单）
 
@@ -133,4 +137,7 @@ Web 首页冒烟。tag 触发的 `release.yml` 负责 GHCR 发布、Trivy 门禁
 - 登录限流用 Redis 计数，语义是“窗口内失败次数 + 锁定 TTL”，非精确滑动窗口。
 - 注册当前开放且无邮箱验证；生产入口建议在反向代理/WAF 增加注册限流。登录锁定按邮箱计数，存在被恶意连续失败定向锁号的风险，必要时改为“邮箱 + 来源 IP”双键。
 - 取消是**协作式**：API 写 `cancel_requested`，worker 在阶段边界检查；不保证立即杀死进程。
+- CLI 本地模式在 Docker 不可用时会**拒绝**执行目标代码；必须显式加 `--allow-host-execution`（或在 `replay` 上加同名参数）才在宿主运行，且该模式不是安全边界。
+- 沙箱运行容器使用 `read_only + tmpfs(/tmp,/workspace)`、非 root、cap_drop、no-new-privileges、pids/内存/CPU 限制；项目自带 seccomp profile 需要宿主可见路径才能启用，默认使用 Docker 默认 seccomp。
+- 桌面壳仍基于 Electron 31（Chromium 126）；升级到受支持版本需要下载新运行时并在真实桌面环境回归，本轮未在无 GUI 的沙箱内强行升级。
 - `revivebench` 的数字必须来自真实运行；未跑过的格子写“待测”，仓库内无编造数据。
