@@ -1,6 +1,6 @@
 # ReviveOS 提交材料
 
-核实日期：2026-10-30；录制日期：2026-10-28；生产部署验收已完成。公开代码仓库已创建并推送当前工作区版本。
+核实日期：2026-10-30；录制日期：2026-10-28；生产部署验收已完成。公开代码仓库已创建并推送，四分钟发布片已上传 GitHub Release。
 
 ## 01 代码仓库链接
 
@@ -43,7 +43,10 @@ node tools/export_submission.mjs
 
 ## 03 作品演示视频链接
 
-**状态：已录制四分钟发布片；尚无公开播放链接。**
+**状态：已上传公开 GitHub Release 资产。**
+
+- 发布页：https://github.com/Wildcreator2010/ReviveOS/releases/tag/v1.0-submission
+- 视频文件：https://github.com/Wildcreator2010/ReviveOS/releases/download/v1.0-submission/reviveos-film-4min.mp4
 
 主演示：[reviveos-film-4min.mp4](../promo/out/reviveos-film-4min.mp4)
 
@@ -97,11 +100,11 @@ node tools/export_submission.mjs
 | 内容 | 界面截图、Canvas 动画、程序合成配乐 |
 | 性质 | 产品宣传片 |
 
-### 发布前仍需
+### 公开地址与播放方式
 
-- 上传四分钟发布片到提交平台可访问的地址，提供真正的播放页或分享链接，不填本机路径。
-- 确认权限、有效期、音画与清晰度，验证评审方可以打开；若需提取码，单独注明。
-- 当前未执行上传或发布；发布平台与账号需要由用户确定。
+- GitHub Release 资产可直接下载并用本地播放器打开，评审无需登录。
+- Release 页面提供资产列表与文件大小；直接资产链接由 GitHub 跳转到其文件存储。
+- 如果提交平台强制要求站内在线播放器，需另传 Bilibili、YouTube 等视频平台；GitHub 资产本身不提供网页播放器。
 
 ## 实测结果与重要边界
 
@@ -121,6 +124,6 @@ node tools/export_submission.mjs
 - [x] 已有 80 秒宣传片。
 - [x] 已有四分钟发布片；含配乐，无 AI 生成图片。
 - [x] 已有详细使用方案（Web / CLI / API / 生产部署）。
-- [ ] 可供评审访问的视频播放或分享链接。
+- [x] [可供评审访问的视频发布页](https://github.com/Wildcreator2010/ReviveOS/releases/tag/v1.0-submission)。
 
-尚需补齐的是公开视频播放链接；公开代码仓库已推送。
+三项提交材料均已具备；公开视频为 GitHub Release 资产。
