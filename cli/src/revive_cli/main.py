@@ -19,7 +19,7 @@ from revive_core import schemas
 from revive_core.archaeology import PypiClient, build_timeline, extract_evidence, fetch_repo, infer_genome
 from revive_core.capsule.replay import replay as replay_capsule
 from revive_core.capsule.verify import verify as verify_capsule
-from revive_core.sandbox.executor import NullEventPort, sandbox_tmpdir
+from revive_core.sandbox.executor import NullEventPort, SandboxUnavailableError, sandbox_tmpdir
 from revive_core.sandbox.port_impl import DockerExecutionPort, LocalExecutionPort, docker_available
 from rich.console import Console
 
@@ -135,9 +135,10 @@ def _make_execution_port(
     job_id: str,
     keep_sandbox: bool,
     events: Any = None,
+    allow_host_execution: bool = False,
 ) -> Any:
-    """Select Docker in a capable host, otherwise the explicit local substitute."""
-    available, _reason = docker_available()
+    """Select Docker in a capable host, otherwise require explicit host opt-in."""
+    available, reason = docker_available()
     if available:
         return DockerExecutionPort(
             workspace=source,
@@ -145,6 +146,10 @@ def _make_execution_port(
             keep_sandbox=keep_sandbox,
             base_dir=work_root / "docker",
             events=events,
+        )
+    if not allow_host_execution:
+        raise SandboxUnavailableError(
+            f"Docker is unavailable ({reason}); pass --allow-host-execution to run target code on this host"
         )
     return LocalExecutionPort(
         workspace=work_root / "sandbox",
@@ -163,6 +168,7 @@ async def _run_local_pipeline(
     keep_sandbox: bool,
     out: Path | None,
     work_root: Path | None,
+    allow_host_execution: bool = False,
 ) -> Any:
     root = work_root or sandbox_tmpdir("revive-local-run-")
     root.mkdir(parents=True, exist_ok=True)
@@ -177,6 +183,7 @@ async def _run_local_pipeline(
         job_id=job_id,
         keep_sandbox=keep_sandbox,
         events=event_port,
+        allow_host_execution=allow_host_execution,
     )
     provider: Any = None
     repair_policy: Any = None
@@ -223,6 +230,11 @@ def resurrect(
     keep_sandbox: bool = typer.Option(False, "--keep-sandbox", help="Keep the local sandbox workspace."),  # noqa: B008
     out: Path | None = typer.Option(None, "--out", help="Output .revive path in local mode."),  # noqa: B008
     work_root: Path | None = typer.Option(None, "--work-root", help="Scratch root for local mode."),  # noqa: B008
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Allow local mode to run target code on this host when Docker is unavailable.",
+    ),  # noqa: B008
 ) -> None:
     """Resurrect a repository locally or submit it to the control plane."""
     if local:
@@ -235,6 +247,7 @@ def resurrect(
                     keep_sandbox=keep_sandbox,
                     out=out,
                     work_root=work_root,
+                    allow_host_execution=allow_host_execution,
                 )
             )
         except typer.Exit:
@@ -308,12 +321,31 @@ def verify(
 def replay(
     capsule: Path = typer.Argument(..., exists=True, readable=True, help="Path to a .revive capsule."),  # noqa: B008
     command: list[str] = typer.Argument(None, help="Command to run inside the replay workspace."),  # noqa: B008
+    allow_host_execution: bool = typer.Option(
+        False,
+        "--allow-host-execution",
+        help="Run the capsule on this host when Docker is unavailable.",
+    ),  # noqa: B008
 ) -> None:
     """Re-enter a capsule workspace and run a command."""
 
     async def _run() -> Any:
         workspace = sandbox_tmpdir("revive-replay-cli-")
-        execution = LocalExecutionPort(workspace=workspace, ephemeral=True, offline=True)
+        available, reason = docker_available()
+        execution: Any
+        if available:
+            execution = DockerExecutionPort(
+                workspace=workspace,
+                job_id=f"replay-{os.getpid()}",
+                base_dir=workspace.parent / "replay-docker",
+            )
+        elif allow_host_execution:
+            execution = LocalExecutionPort(workspace=workspace, ephemeral=True, offline=True)
+        else:
+            _fail(
+                f"Docker is unavailable ({reason}); pass --allow-host-execution to replay on this host",
+                2,
+            )
         try:
             return await replay_capsule(capsule, execution, argv=command or None, workspace=workspace)
         finally:

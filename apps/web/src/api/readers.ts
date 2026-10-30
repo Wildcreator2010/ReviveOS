@@ -63,6 +63,7 @@ export interface ScoreComponent {
 
 export interface ScoreView {
   total: number | null;
+  status: string | null;
   components: ScoreComponent[];
   raw: Json;
 }
@@ -287,7 +288,7 @@ export function readScore(value: unknown): ScoreView | null {
     value: num(raw[key]),
     weight: SCORE_WEIGHTS[key] ?? null,
   }));
-  return { total: num(raw.total), components, raw };
+  return { total: num(raw.total), status: str(raw.status), components, raw };
 }
 
 export function readPatches(value: unknown): PatchView[] {

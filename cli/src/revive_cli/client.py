@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -122,7 +122,7 @@ class ReviveClient:
     # -- auth ------------------------------------------------------------
     def login_password(self, email: str, password: str) -> dict[str, Any]:
         response = self.request("POST", "/api/v1/auth/login", json={"email": email, "password": password})
-        payload = response.json()
+        payload = cast(dict[str, Any], response.json())
         self.access_token = str(payload.get("access_token", ""))
         self.refresh_token = str(payload.get("refresh_token", ""))
         return payload

@@ -66,7 +66,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/auth/register": {
@@ -248,7 +256,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -287,7 +303,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/auth/api-keys/{key_id}": {
@@ -322,7 +346,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects": {
@@ -381,7 +413,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -420,7 +460,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}": {
@@ -462,7 +510,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -512,7 +568,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -545,7 +609,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/resurrect": {
@@ -604,7 +676,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/jobs": {
@@ -645,7 +725,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -718,7 +806,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/jobs/{job_id}": {
@@ -760,7 +856,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/jobs/{job_id}/cancel": {
@@ -802,7 +906,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/evidence": {
@@ -886,7 +998,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -936,7 +1056,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/genome": {
@@ -980,7 +1108,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/builds": {
@@ -1024,7 +1160,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/patches": {
@@ -1068,7 +1212,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/behavior": {
@@ -1112,7 +1264,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/score": {
@@ -1156,7 +1316,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/jobs/{job_id}/events": {
@@ -1219,7 +1387,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/jobs/{job_id}/events/stream": {
@@ -1275,7 +1451,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/jobs/{job_id}/capsule": {
@@ -1343,7 +1527,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "WorkerTokenAuth": []
+          }
+        ]
       }
     },
     "/projects/{project_id}/capsules": {
@@ -1411,7 +1600,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/capsules/{capsule_id}": {
@@ -1453,7 +1650,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -1486,7 +1691,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/capsules/{capsule_id}/download": {
@@ -1508,8 +1721,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "302": {
+            "description": "Redirect to the signed capsule content URL",
             "content": {
               "application/json": {
                 "schema": {}
@@ -1526,7 +1739,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/admin/jobs": {
@@ -1601,7 +1822,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/admin/jobs/{job_id}/kill": {
@@ -1643,7 +1872,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/admin/costs/daily": {
@@ -1666,7 +1903,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/admin/maintenance": {
@@ -1707,7 +1952,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/admin/llm": {
@@ -1728,7 +1981,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -1767,7 +2028,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/admin/llm/test": {
@@ -1788,7 +2057,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/me": {
@@ -1809,7 +2086,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/auth/register": {
@@ -1991,7 +2276,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -2030,7 +2323,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/auth/api-keys/{key_id}": {
@@ -2065,7 +2366,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects": {
@@ -2124,7 +2433,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -2163,7 +2480,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}": {
@@ -2205,7 +2530,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "patch": {
         "tags": [
@@ -2255,7 +2588,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -2288,7 +2629,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/resurrect": {
@@ -2347,7 +2696,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/jobs": {
@@ -2388,7 +2745,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "get": {
         "tags": [
@@ -2461,7 +2826,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/jobs/{job_id}": {
@@ -2503,7 +2876,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/jobs/{job_id}/cancel": {
@@ -2545,7 +2926,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/evidence": {
@@ -2629,7 +3018,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -2679,7 +3076,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/genome": {
@@ -2723,7 +3128,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/builds": {
@@ -2767,7 +3180,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/patches": {
@@ -2811,7 +3232,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/behavior": {
@@ -2855,7 +3284,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/score": {
@@ -2899,7 +3336,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/jobs/{job_id}/events": {
@@ -2962,7 +3407,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/jobs/{job_id}/events/stream": {
@@ -3018,7 +3471,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/jobs/{job_id}/capsule": {
@@ -3086,7 +3547,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "WorkerTokenAuth": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{project_id}/capsules": {
@@ -3154,7 +3620,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/capsules/{capsule_id}": {
@@ -3196,7 +3670,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "delete": {
         "tags": [
@@ -3229,7 +3711,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/capsules/{capsule_id}/download": {
@@ -3251,8 +3741,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Successful Response",
+          "302": {
+            "description": "Redirect to the signed capsule content URL",
             "content": {
               "application/json": {
                 "schema": {}
@@ -3269,7 +3759,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/admin/jobs": {
@@ -3344,7 +3842,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/admin/jobs/{job_id}/kill": {
@@ -3386,7 +3892,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/admin/costs/daily": {
@@ -3409,7 +3923,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/admin/maintenance": {
@@ -3450,7 +3972,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/admin/llm": {
@@ -3471,7 +4001,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -3510,7 +4048,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     },
     "/api/v1/admin/llm/test": {
@@ -3531,7 +4077,15 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          }
+        ]
       }
     }
   },
@@ -3598,6 +4152,18 @@
               }
             ],
             "title": "Created At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
           }
         },
         "type": "object",
@@ -4461,6 +5027,23 @@
           "type"
         ],
         "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Revive-Key"
+      },
+      "WorkerTokenAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Worker-Token"
       }
     }
   }

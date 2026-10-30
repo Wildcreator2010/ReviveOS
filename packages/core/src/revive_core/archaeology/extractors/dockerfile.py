@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import PurePosixPath
+from typing import Any
 
 from ..evidence import EvidenceItem, EvidenceReference, ExtractContext
 from .common import normalize_python_version
@@ -38,8 +39,8 @@ def _detect_os(name: str, tag: str) -> str | None:
     return None
 
 
-def _classify(name: str, tag: str) -> dict:
-    facts: dict = {}
+def _classify(name: str, tag: str) -> dict[str, Any]:
+    facts: dict[str, Any] = {}
     lowered = name.lower()
     if lowered.endswith("python") or lowered == "python":
         facts["python_version"] = normalize_python_version(tag)
@@ -56,7 +57,7 @@ def _classify(name: str, tag: str) -> dict:
 
 
 def extract(rel_path: str, text: str, ctx: ExtractContext) -> list[EvidenceItem]:
-    stages: list[dict] = []
+    stages: list[dict[str, Any]] = []
     for line in text.splitlines():
         match = FROM_RE.match(line)
         if not match:

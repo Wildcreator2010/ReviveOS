@@ -147,7 +147,20 @@ SCANNED_SUFFIXES = frozenset(
     }
 )
 SCANNED_FILE_NAMES = frozenset(
-    {"Dockerfile", "Makefile", ".npmrc", ".gitignore", ".dockerignore", ".env", ".env.example"}
+    {
+        "Dockerfile",
+        "Dockerfile.api",
+        "Dockerfile.web",
+        "Dockerfile.worker",
+        "Caddyfile",
+        "web-nginx.conf",
+        "Makefile",
+        ".npmrc",
+        ".gitignore",
+        ".dockerignore",
+        ".env",
+        ".env.example",
+    }
 )
 
 COMPILED_SECRETS = tuple((rule, re.compile(pattern), description) for rule, pattern, description in SECRET_PATTERNS)

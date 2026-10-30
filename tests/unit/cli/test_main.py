@@ -4,9 +4,11 @@ import os
 import stat
 from types import SimpleNamespace
 
+import pytest
 from revive_cli.auth import Credentials, CredentialStore
 from revive_cli.client import ReviveClient
-from revive_cli.main import _persist_client_credentials, app
+from revive_cli.main import _make_execution_port, _persist_client_credentials, app
+from revive_core.sandbox.port_impl import LocalExecutionPort, SandboxUnavailableError
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -92,3 +94,31 @@ def test_resurrect_server_mode_does_not_call_an_unfinished_stream_a_success(monk
 
     assert result.exit_code == 2
     assert "终态" in result.stdout or "终态" in result.stderr
+
+
+def test_local_pipeline_refuses_host_execution_when_docker_is_missing(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("revive_cli.main.docker_available", lambda: (False, "no daemon"))
+
+    with pytest.raises(SandboxUnavailableError, match="Docker"):
+        _make_execution_port(
+            work_root=tmp_path,
+            source=None,
+            job_id="local-test",
+            keep_sandbox=False,
+            events=None,
+        )
+
+
+def test_local_pipeline_allows_host_execution_only_when_explicitly_requested(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("revive_cli.main.docker_available", lambda: (False, "no daemon"))
+
+    port = _make_execution_port(
+        work_root=tmp_path,
+        source=None,
+        job_id="local-test",
+        keep_sandbox=False,
+        events=None,
+        allow_host_execution=True,
+    )
+
+    assert isinstance(port, LocalExecutionPort)

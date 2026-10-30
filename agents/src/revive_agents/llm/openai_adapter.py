@@ -58,7 +58,11 @@ class OpenAIProvider(HTTPProvider):
         self.name = provider_name
         self.api_key = api_key
         self.model = model
-        self.base_url = (base_url or DEFAULT_BASE_URL).rstrip("/")
+        resolved_base = (base_url or DEFAULT_BASE_URL).rstrip("/")
+        from ._http import validate_base_url
+
+        validate_base_url(resolved_base)
+        self.base_url = resolved_base
         self._endpoint = f"{self.base_url}/chat/completions"
 
     def _headers(self) -> dict[str, str]:

@@ -23,8 +23,9 @@ import tarfile
 import time
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ..gitutil import GitUnavailableError, run_git
 from . import diffapply
@@ -37,6 +38,7 @@ from .executor import (
     NETWORK_DISABLED,
     SANDBOX_USER,
     TMPFS_SPEC,
+    WORKSPACE_TMPFS_SPEC,
     ArtifactRef,
     EventPort,
     PatchResult,
@@ -49,7 +51,7 @@ from .executor import (
     sha256_bytes,
     write_artifact,
 )
-from .image_matrix import ImagePlan, Unsupported, plan_image
+from .image_matrix import ImagePlan, Unsupported, plan_image, resolve_digest
 
 _PIP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9._, -]+\])?$")
 _PIP_VERSION_RE = re.compile(r"^[A-Za-z0-9.*+!_~-]+$")
@@ -60,10 +62,10 @@ def _genome_mapping(genome: Any) -> Mapping[str, Any]:
     if genome is None:
         return {}
     if isinstance(genome, Mapping):
-        return genome
+        return cast(Mapping[str, Any], genome)
     dump = getattr(genome, "model_dump", None)
     if callable(dump):
-        return dump()
+        return cast(Mapping[str, Any], dump())
     return {}
 
 
@@ -547,22 +549,46 @@ class LocalExecutionPort:
 # --------------------------------------------------------------------------
 # DockerExecutionPort
 # --------------------------------------------------------------------------
-def sandbox_security_kwargs(job_id: str, *, network_disabled: bool = NETWORK_DISABLED) -> dict[str, Any]:
+def sandbox_security_kwargs(
+    job_id: str, *, network_disabled: bool = NETWORK_DISABLED, seccomp_profile: str | None = None
+) -> dict[str, Any]:
     """The single source of truth for runtime container hardening."""
 
+    security_opt = ["no-new-privileges"]
+    if seccomp_profile:
+        security_opt.append(f"seccomp:{seccomp_profile}")
     return {
         "network_disabled": network_disabled,
         "user": SANDBOX_USER,
         "working_dir": "/workspace",
-        "tmpfs": {"/tmp": TMPFS_SPEC},
+        "read_only": True,
+        "tmpfs": {"/tmp": TMPFS_SPEC, "/workspace": WORKSPACE_TMPFS_SPEC},
         "mem_limit": MEM_LIMIT,
         "nano_cpus": int(CPU_LIMIT * 1_000_000_000),
-        "security_opt": ["no-new-privileges"],
+        "security_opt": security_opt,
         "cap_drop": ["ALL"],
-        "pids_limit": 512,
+        "pids_limit": 256,
         "privileged": False,
         "labels": {LABEL_KEY: job_id},
     }
+
+
+_RESOLVED_DIGESTS: dict[str, str] = {}
+
+
+def _pin_image_plan(plan: ImagePlan, client: Any = None) -> ImagePlan:
+    if not plan.digest_expected or plan.os_digest:
+        return plan
+    if plan.os_image not in _RESOLVED_DIGESTS:
+        digest = resolve_digest(plan.os_image)
+        if not digest and client is not None:
+            try:
+                digest = str(client.images.get_registry_data(plan.os_image).id or "")
+            except Exception:  # pragma: no cover - registry/network dependent
+                digest = ""
+        _RESOLVED_DIGESTS[plan.os_image] = digest or ""
+    digest = _RESOLVED_DIGESTS[plan.os_image]
+    return replace(plan, os_digest=digest) if digest else plan
 
 
 def sweep_orphans(client: Any, job_id: str | None = None) -> list[str]:
@@ -617,6 +643,7 @@ class DockerExecutionPort:
         self._container: Any = None
         self._handle: SandboxHandle | None = None
         self._closed = False
+        self.seccomp_profile = os.getenv("REVIVE_SANDBOX__SECCOMP_PROFILE", "").strip() or None
         self._allow_network = False
         self._run_index = 0
 
@@ -643,6 +670,13 @@ class DockerExecutionPort:
         return await self.ensure_env_from_plan(plan, genome=genome)
 
     async def ensure_env_from_plan(self, plan: ImagePlan, *, genome: Any = None) -> SandboxHandle:
+        plan = _pin_image_plan(plan, self.client)
+        if (
+            plan.digest_expected
+            and not plan.os_digest
+            and os.getenv("REVIVE_SANDBOX__REQUIRE_DIGEST", "").lower() in {"1", "true", "yes", "on"}
+        ):
+            raise SandboxUnavailableError(f"could not resolve a digest for sandbox image {plan.os_image}")
         dockerfile = dockerfile_with_dependencies(render_dockerfile(plan), dependency_specs(genome))
         dockerfile_path = self.base_dir / "Dockerfile.resurrected-base"
         dockerfile_path.write_text(dockerfile, encoding="utf-8")
@@ -660,7 +694,11 @@ class DockerExecutionPort:
             image.id,
             command=["sleep", "infinity"],
             detach=True,
-            **sandbox_security_kwargs(self.job_id, network_disabled=not self._allow_network),
+            **sandbox_security_kwargs(
+                self.job_id,
+                network_disabled=not self._allow_network,
+                seccomp_profile=self.seccomp_profile,
+            ),
         )
         self._container = container
         handle = SandboxHandle(
@@ -726,7 +764,7 @@ class DockerExecutionPort:
 
         def _exec() -> tuple[int, bytes, bytes]:
             result = self._container.exec_run(
-                [str(a) for a in argv],
+                ["timeout", "--kill-after=5", f"{max(1, int(timeout))}s", *[str(a) for a in argv]],
                 user=SANDBOX_USER,
                 workdir="/workspace",
                 demux=True,
@@ -740,7 +778,11 @@ class DockerExecutionPort:
             )
 
         try:
-            code, out, err = await asyncio.wait_for(asyncio.to_thread(_exec), timeout=timeout)
+            code, out, err = await asyncio.wait_for(asyncio.to_thread(_exec), timeout=timeout + 5)
+            if code == 124:
+                timed_out = True
+                code = -1
+                err = err or f"timeout after {timeout}s".encode()
         except TimeoutError:
             timed_out = True
             code, out, err = -1, b"", f"timeout after {timeout}s; container killed".encode()

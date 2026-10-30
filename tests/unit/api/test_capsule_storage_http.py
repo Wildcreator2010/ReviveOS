@@ -49,6 +49,15 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def do_HEAD(self) -> None:
+        self._record()
+        if self.path not in self.store.objects:
+            self.send_response(404)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.end_headers()
+
     def do_DELETE(self) -> None:
         self._record()
         self.store.objects.pop(self.path, None)
@@ -87,13 +96,15 @@ async def test_s3_capsule_storage_round_trip_over_real_http(s3_server) -> None:
     assert store.objects[f"/capsules/{key}"] == content
 
     assert await storage.get(key) == content
+    assert await storage.exists(key) is True
 
     await storage.delete(key)
     assert store.objects == {}
+    assert await storage.exists(key) is False
 
     # Deleting a missing object is idempotent, not an error.
     await storage.delete(key)
 
     methods = [entry["method"] for entry in store.requests]
-    assert methods == ["PUT", "GET", "DELETE", "DELETE"]
+    assert methods == ["PUT", "GET", "HEAD", "DELETE", "HEAD", "DELETE"]
     assert all(entry["authorization"].startswith("AWS4-HMAC-SHA256 ") for entry in store.requests)

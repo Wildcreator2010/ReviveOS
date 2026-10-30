@@ -1,5 +1,10 @@
 .git
 .github
+.env
+.env.*
+**/.env
+**/.env.*
+infra/envs/*.env
 .venv
 .uv-cache
 .uv-python
@@ -8,6 +13,8 @@ node_modules
 apps/web/.next
 apps/web/node_modules
 apps/desktop/node_modules
+apps/desktop/web
+apps/desktop/release
 *.pyc
 __pycache__
 pytest-cache-files-*

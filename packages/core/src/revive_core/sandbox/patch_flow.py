@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +28,18 @@ from .executor import EventPort, PatchResult, SandboxHandle, SnapshotToken
 MAX_ITERATIONS = 5
 MAX_FILES = 10
 MAX_LINES = 300
+
+_TEST_PATH = re.compile(
+    r"(^|/)(tests?)(/|$)|(^|/)test_[^/]*\.py$|(^|/)[^/]*_test\.py$|(^|/)conftest\.py$|(^|/)(pytest|tox)\.ini$|(^|/)noxfile\.py$",
+    re.IGNORECASE,
+)
+
+
+def protected_patch_reason(path: str) -> str | None:
+    normalized = path.replace("\\", "/").lstrip("./").lower()
+    if _TEST_PATH.search(normalized):
+        return f"test files are immutable under the repair policy: {path}"
+    return None
 
 
 @dataclass
@@ -129,6 +142,10 @@ def validate_proposal(proposal: PatchProposal) -> str | None:
         return f"patch touches {len(files)} files (limit {MAX_FILES})"
     if lines > MAX_LINES:
         return f"patch changes {lines} lines (limit {MAX_LINES})"
+    for path in sorted(files):
+        reason = protected_patch_reason(path)
+        if reason is not None:
+            return reason
     return None
 
 
@@ -196,7 +213,14 @@ async def apply_and_verify(
             validation="apply_failed",
         )
 
-    rerun_result = await _call(rerun)
+    try:
+        rerun_result = await _call(rerun)
+    except Exception:
+        if snapshot is not None:
+            await port.restore_ws(snapshot)
+        if events is not None:
+            await events.emit({"type": "repair.attempt", "payload": {"applied": True, "rolled_back": True}})
+        raise
     if not _run_ok(rerun_result):
         await port.restore_ws(snapshot)
         if events is not None:

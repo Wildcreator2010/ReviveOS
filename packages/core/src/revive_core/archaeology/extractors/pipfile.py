@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import PurePosixPath
+from typing import Any
 
 from ..evidence import EvidenceItem, EvidenceReference, ExtractContext, inference_warning
 from .common import as_mapping, floor_python_version, make_dependency, parse_requirement_line
@@ -13,7 +14,7 @@ def matches(rel_path: str) -> bool:
     return PurePosixPath(rel_path).name == "Pipfile"
 
 
-def _entry(name: str, value: object, *, source: str) -> dict | None:
+def _entry(name: str, value: object, *, source: str) -> dict[str, Any] | None:
     if isinstance(value, str):
         text = value.strip()
         if text in ("", "*"):
@@ -41,7 +42,7 @@ def extract(rel_path: str, text: str, ctx: ExtractContext) -> list[EvidenceItem]
     except (tomllib.TOMLDecodeError, ValueError) as exc:
         return [inference_warning(rel_path, f"Pipfile could not be parsed: {exc}", commit_sha=ctx.commit_sha)]
 
-    deps: list[dict] = []
+    deps: list[dict[str, Any]] = []
     for section in ("packages", "dev-packages"):
         group = as_mapping(data.get(section))
         for name, value in group.items():
@@ -49,7 +50,7 @@ def extract(rel_path: str, text: str, ctx: ExtractContext) -> list[EvidenceItem]
             if dep is not None:
                 deps.append(dep)
 
-    facts: dict = {}
+    facts: dict[str, Any] = {}
     if deps:
         facts["dependencies"] = deps
     requires = as_mapping(data.get("requires"))

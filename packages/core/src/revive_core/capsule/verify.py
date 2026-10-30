@@ -155,11 +155,34 @@ async def verify(
         report.errors.append(result.error or "rebuild failed")
         report.verified = False
         return report
+    if score_recompute is not None:
+        manifest = structural.get("manifest") or {}
+        reproduced = score_recompute(manifest)
+        if reproduced is not None:
+            report.score_reproduced = reproduced
+    manifest = structural.get("manifest") or {}
+    reproduced = report.score_reproduced
+    expected_score = (manifest.get("score") or {}).get("total")
+    if reproduced is not None and expected_score is not None:
+        try:
+            mismatch = abs(float(reproduced) - float(expected_score)) > 0.01
+        except (TypeError, ValueError):
+            mismatch = True
+        if mismatch:
+            report.exit_code = EXIT_CORRUPT
+            report.errors.append(f"score mismatch: manifest={expected_score!r} reproduced={reproduced!r}")
+            report.verified = False
+            return report
+    if result.behavior_rematch is None:
+        report.exit_code = EXIT_CORRUPT
+        report.errors.append("behavior rematch unavailable: rebuild did not reproduce behaviour")
+        report.verified = False
+        return report
     if result.behavior_rematch is False:
         report.exit_code = EXIT_BEHAVIOR_DRIFT
         report.verified = False
         return report
-    report.verified = result.behavior_rematch is True
+    report.verified = True
     report.exit_code = EXIT_OK
     return report
 

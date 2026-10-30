@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from . import layout
 from .verify import extract_capsule
@@ -46,10 +46,10 @@ async def replay(
 
     target = Path(workspace) if workspace else sandbox_tmpdir("revive-replay-")
     extract_capsule(capsule, target)
-    handle = await port.ensure_env(None)
     if hasattr(port, "workspace"):
-        port.workspace = target  # local backend: point it at the capsule tree
-        handle.ws_path = str(target)
+        port.workspace = target  # Docker copies this tree; local runs in place
+    genome = _capsule_genome(target)
+    await port.ensure_env(genome)
     command = list(argv or ["python", "-c", "print('revive replay: no command supplied')"])
     result = await port.run("replay", command, 120.0)
     stdout = _read(port, target, result.stdout_ref)
@@ -63,12 +63,21 @@ async def replay(
     )
 
 
+def _capsule_genome(target: Path) -> dict[str, Any] | None:
+    path = target / layout.GENOME
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def _read(port: Any, target: Path, ref: Any) -> str:
     if ref is None:
         return ""
     root = getattr(port, "artifacts_dir", None)
     if root is not None:
-        path = Path(root) / ref.path
+        path = Path(root) / cast(str, ref.path)
         if path.is_file():
             return path.read_text(encoding="utf-8", errors="replace")
     return ""
@@ -84,7 +93,7 @@ def capsule_manifest(capsule: str | Path) -> dict[str, Any]:
         stream = archive.extractfile(member)
         if stream is None:  # pragma: no cover
             raise ValueError("manifest.json is empty")
-        return json.loads(stream.read().decode("utf-8"))
+        return cast(dict[str, Any], json.loads(stream.read().decode("utf-8")))
 
 
 __all__ = ["ReplayResult", "replay", "capsule_manifest"]

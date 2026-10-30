@@ -1129,6 +1129,8 @@ export interface components {
             label?: string | null;
             /** Created At */
             created_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
         };
         /** CapsuleListResponse */
         CapsuleListResponse: {
@@ -2523,8 +2525,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Redirect to the signed capsule content URL */
+            302: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3735,8 +3737,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Redirect to the signed capsule content URL */
+            302: {
                 headers: {
                     [name: string]: unknown;
                 };

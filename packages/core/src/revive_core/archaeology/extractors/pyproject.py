@@ -31,7 +31,7 @@ def _poetry_python_floor(spec: Any) -> str | None:
     return floor_python_version(text)
 
 
-def _poetry_dependency(name: str, value: Any, *, source: str) -> dict | None:
+def _poetry_dependency(name: str, value: Any, *, source: str) -> dict[str, Any] | None:
     if isinstance(value, str):
         dep = parse_requirement_line(f"{name}{value}", source=source)
         if dep is None:
@@ -52,7 +52,7 @@ def _poetry_dependency(name: str, value: Any, *, source: str) -> dict | None:
     return None
 
 
-def _toml_load(rel_path: str, text: str, ctx: ExtractContext):
+def _toml_load(rel_path: str, text: str, ctx: ExtractContext) -> tuple[dict[str, Any] | None, EvidenceItem | None]:
     try:
         return tomllib.loads(text), None
     except (tomllib.TOMLDecodeError, ValueError) as exc:
@@ -71,9 +71,9 @@ def extract(rel_path: str, text: str, ctx: ExtractContext) -> list[EvidenceItem]
     poetry = as_mapping(tool.get("poetry"))
     build_system = as_mapping(data.get("build-system"))
 
-    deps: list[dict] = []
+    deps: list[dict[str, Any]] = []
     warnings: list[str] = []
-    extras: dict[str, list[dict]] = {}
+    extras: dict[str, list[dict[str, Any]]] = {}
     classifiers: list[str] = []
     python_requires_raw: Any = None
 
@@ -146,7 +146,7 @@ def extract(rel_path: str, text: str, ctx: ExtractContext) -> list[EvidenceItem]
             if parsed:
                 extras[group] = parsed
 
-    facts: dict = {}
+    facts: dict[str, Any] = {}
     if python_requires_raw is not None:
         facts["python_requires_raw"] = str(python_requires_raw)
         floor = _poetry_python_floor(python_requires_raw)

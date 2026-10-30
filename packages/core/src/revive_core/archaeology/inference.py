@@ -257,7 +257,7 @@ def _merge_dependencies(items: list[EvidenceItem]) -> dict[str, _DepRecord]:
         deps = item.facts.get("dependencies") if isinstance(item.facts, dict) else None
         if not isinstance(deps, list):
             continue
-        is_lock = bool(item.facts.get("lock")) or item.source_kind == "lock"
+        is_lock = bool(item.facts.get("lock"))
         for dep in deps:
             if not isinstance(dep, dict):
                 continue

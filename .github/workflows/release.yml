@@ -39,41 +39,46 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish ${{ matrix.name }}
+      - name: Build and load ${{ matrix.name }}
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          push: true
+          push: false
+          load: true
           tags: ghcr.io/${{ github.repository_owner }}/reviveos-${{ matrix.name }}:${{ env.RELEASE_TAG }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ env.RELEASE_TAG }}
 
-      - name: Record immutable digest
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s=%s\n' "${{ matrix.name }}" "${{ steps.build.outputs.digest }}" > "digest-${{ matrix.name }}.txt"
-          cat "digest-${{ matrix.name }}.txt"
-
-      - name: Vulnerability gate (HIGH/CRITICAL)
+      - name: Vulnerability gate (HIGH/CRITICAL) before publish
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/reviveos-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          image-ref: ghcr.io/${{ github.repository_owner }}/reviveos-${{ matrix.name }}:${{ env.RELEASE_TAG }}
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: false
 
-      - name: SBOM (CycloneDX)
+      - name: SBOM (CycloneDX) before publish
         uses: anchore/sbom-action@v0
         with:
-          image: ghcr.io/${{ github.repository_owner }}/reviveos-${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          image: ghcr.io/${{ github.repository_owner }}/reviveos-${{ matrix.name }}:${{ env.RELEASE_TAG }}
           format: cyclonedx-json
           output-file: sbom-${{ matrix.name }}.cyclonedx.json
           upload-artifact: false
+
+      - name: Publish only after the gates pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${{ github.repository_owner }}/reviveos-${{ matrix.name }}:${{ env.RELEASE_TAG }}"
+          docker push "$image"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$image" | cut -d@ -f2)
+          test -n "$digest"
+          printf '%s=%s\n' "${{ matrix.name }}" "$digest" > "digest-${{ matrix.name }}.txt"
+          cat "digest-${{ matrix.name }}.txt"
 
       - uses: actions/upload-artifact@v4
         with:

@@ -1,4 +1,6 @@
-.env*
+.env
+.env.*
+!.env.example
 *.revive
 node_modules/
 __pycache__/
@@ -30,6 +32,7 @@ tests/fixtures/repos/*/
 apps/web/.next/
 apps/web/out/
 apps/desktop/dist/
-apps/desktop/release/
+apps/desktop/web/
+apps/desktop/release*/
 *.log
 .revive-tmp/

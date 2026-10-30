@@ -44,7 +44,9 @@ class ControlPlanePort(Protocol):
     async def jobs_today(self, user_id: str) -> int: ...
     async def update_project(self, project_id: str, **fields: Any) -> None: ...
     async def soft_delete_project(self, project_id: str) -> None: ...
-    async def add_api_key(self, user_id: str, prefix: str, key_hash: str, label: str = "") -> ApiKeyRecord: ...
+    async def add_api_key(
+        self, user_id: str, prefix: str, key_hash: str, label: str = "", expires_at: datetime | None = None
+    ) -> ApiKeyRecord: ...
     async def list_api_keys(self, user_id: str) -> list[ApiKeyRecord]: ...
     async def get_api_key(self, key_id: str, user_id: str | None = None) -> ApiKeyRecord | None: ...
     async def find_api_key(self, token: str) -> ApiKeyRecord | None: ...
@@ -119,8 +121,13 @@ class MemoryControlPlane:
         return self.store.user_by_email(email)
 
     async def authenticate(self, email: str, password: str) -> UserRecord | None:
+        from .security import dummy_verify
+
         user = self.store.user_by_email(email)
-        if user is None or not await run_in_threadpool(verify_password, password, user.password_hash):
+        if user is None:
+            await run_in_threadpool(dummy_verify, password)
+            return None
+        if not await run_in_threadpool(verify_password, password, user.password_hash):
             return None
         return user
 
@@ -237,6 +244,13 @@ class MemoryControlPlane:
             if hasattr(job, name):
                 setattr(job, name, value)
 
+    async def claim_job(self, job_id: str) -> bool:
+        job = self.store.jobs.get(job_id)
+        if job is None or job.status not in {"queued", "cancel_requested"}:
+            return False
+        job.status = "running"
+        return True
+
     async def active_jobs(self, user_id: str) -> list[JobRecord]:
         return self.store.active_jobs(user_id)
 
@@ -256,10 +270,19 @@ class MemoryControlPlane:
         project.deleted_at = datetime.now().astimezone()
         project.status = "deleted"
 
-    async def add_api_key(self, user_id: str, prefix: str, key_hash: str, label: str = "") -> ApiKeyRecord:
+    async def add_api_key(
+        self, user_id: str, prefix: str, key_hash: str, label: str = "", expires_at: datetime | None = None
+    ) -> ApiKeyRecord:
         from .store import ApiKeyRecord
 
-        record = ApiKeyRecord(f"rev_api_key_{__import__('secrets').token_hex(10)}", user_id, prefix, key_hash, label)
+        record = ApiKeyRecord(
+            f"rev_api_key_{__import__('secrets').token_hex(10)}",
+            user_id,
+            prefix,
+            key_hash,
+            label,
+            expires_at=expires_at,
+        )
         self.store.api_keys[record.id] = record
         return record
 
@@ -277,6 +300,7 @@ class MemoryControlPlane:
         for key in self.store.api_keys.values():
             if (
                 key.revoked_at is None
+                and (key.expires_at is None or key.expires_at > datetime.now().astimezone())
                 and key.prefix == prefix
                 and await run_in_threadpool(verify_api_key, token, key.key_hash)
             ):

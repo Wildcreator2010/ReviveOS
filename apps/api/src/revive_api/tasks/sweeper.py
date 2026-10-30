@@ -88,7 +88,7 @@ async def _run() -> dict[str, Any]:
         client.close()
 
 
-@celery_app.task(name=TASK_SWEEP)
+@celery_app.task(name=TASK_SWEEP)  # type: ignore[untyped-decorator]
 def sweep_orphan_sandboxes() -> dict[str, Any]:
     return asyncio.run(_run())
 

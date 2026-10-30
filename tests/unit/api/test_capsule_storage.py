@@ -11,9 +11,13 @@ async def test_memory_capsule_storage_round_trip() -> None:
     storage = MemoryCapsuleStorage()
     await storage.put("capsules/u1/c1.revive", b"payload")
     assert await storage.get("capsules/u1/c1.revive") == b"payload"
+    assert await storage.exists("capsules/u1/c1.revive") is True
+    chunks = [chunk async for chunk in storage.stream("capsules/u1/c1.revive")]
+    assert b"".join(chunks) == b"payload"
     await storage.delete("capsules/u1/c1.revive")
     with pytest.raises(FileNotFoundError):
         await storage.get("capsules/u1/c1.revive")
+    assert await storage.exists("capsules/u1/c1.revive") is False
     assert storage.durable is False
 
 

@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from revive_core.archaeology import extract_evidence, fetch_repo, infer_genome
 from revive_core.behavior.capture import (
@@ -175,7 +175,7 @@ class LocalPipeline:
     def _genome(self, source: Path) -> dict[str, Any]:
         evidence = extract_evidence(source)
         genome = infer_genome(evidence)
-        return json.loads(genome.model_dump_json())
+        return cast(dict[str, Any], json.loads(genome.model_dump_json()))
 
     # -- behaviour -------------------------------------------------------
     def _behavior_plan(self, source: Path) -> BehaviorPlan:
@@ -297,7 +297,9 @@ class LocalPipeline:
         stage_plan = StagePlan(
             package_name=detect_package(source) or "",
             tests_dir="tests",
-            build_argv=list(self.config.build_argv or ["python", "-m", "pip", "install", "-e", "."]),
+            build_argv=list(
+                self.config.build_argv or ["python", "-m", "pip", "install", "--no-build-isolation", "-e", "."]
+            ),
             test_argv=list(self.config.test_argv or ["python", "-m", "pytest", "-x", "-q"]),
             timeout=self.config.timeout,
         )

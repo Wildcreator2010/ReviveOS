@@ -37,6 +37,7 @@ class ApiKeyRecord:
     label: str | None = None
     created_at: datetime = field(default_factory=_now)
     revoked_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 @dataclass
@@ -146,6 +147,9 @@ class EventBus:
             self._queues.pop(job_id, None)
 
 
+MAX_EVENT_REPLAY = 5000
+
+
 class MemoryStore:
     """A process-local substitute for PostgreSQL, Redis and object storage."""
 
@@ -224,7 +228,7 @@ class MemoryStore:
             self.events[event_id]
             for event_id in self.events_by_job.get(job_id, [])
             if self.events[event_id].sequence > start
-        ]
+        ][-MAX_EVENT_REPLAY:]
 
     def active_jobs(self, user_id: str) -> list[JobRecord]:
         return [

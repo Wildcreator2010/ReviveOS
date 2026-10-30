@@ -5,17 +5,20 @@ import { StatusBadge } from "../../../components/ui/StatusBadge";
 import type { ScoreView } from "../../../src/api/readers";
 import type { State } from "../../../lib/tokens";
 
-/** Judgement mapping is documented in the capsule contract (T-CAP-01); the console only mirrors it. */
-export function judgementForScore(total: number | null): { state: State; label: string; reason: string } {
+/** Judgement mapping is documented in the capsule contract (T-CAP-01); the console mirrors the API status. */
+export function judgementForScore(total: number | null, status: string | null = null): { state: State; label: string; reason: string } {
+  if (status === "alive" || status === "partial" || status === "dead") {
+    return { state: status, label: status.toUpperCase(), reason: `API status = ${status}` };
+  }
   if (total === null) return { state: "neutral", label: "无判定", reason: "API 未返回 total。" };
-  if (total >= 80) return { state: "alive", label: "ALIVE", reason: "total ≥ 80" };
-  if (total >= 50) return { state: "partial", label: "PARTIAL", reason: "50 ≤ total < 80" };
-  return { state: "dead", label: "DEAD", reason: "total < 50" };
+  if (total >= 85) return { state: "alive", label: "ALIVE", reason: "total ≥ 85（需 API 确认可复现）" };
+  if (total >= 60) return { state: "partial", label: "PARTIAL", reason: "60 ≤ total < 85" };
+  return { state: "dead", label: "DEAD", reason: "total < 60" };
 }
 
 export function ScorePanel({ score }: { score: ScoreView }) {
-  const judgement = judgementForScore(score.total);
-  const degraders = score.components.filter((component) => component.value !== null && component.value < 80);
+  const judgement = judgementForScore(score.total, score.status);
+  const degraders = score.components.filter((component) => component.value !== null && component.value < 85);
 
   return (
     <div className="stack">
@@ -36,7 +39,7 @@ export function ScorePanel({ score }: { score: ScoreView }) {
                 key={component.key}
                 label={`${component.label}${component.weight === null ? "" : ` (${component.weight})`}`}
                 value={component.value}
-                toneState={component.value === null ? "neutral" : component.value >= 80 ? "alive" : component.value >= 50 ? "partial" : "dead"}
+                toneState={component.value === null ? "neutral" : component.value >= 85 ? "alive" : component.value >= 60 ? "partial" : "dead"}
                 hint={`权重 ${component.weight ?? "未知"}；数值直接来自 API`}
               />
             ))}
@@ -48,7 +51,7 @@ export function ScorePanel({ score }: { score: ScoreView }) {
         <strong>触发降级的分量</strong>
         <p className="small" style={{ margin: "6px 0 0" }}>
           {degraders.length === 0
-            ? "所有分项均 ≥ 80，没有额外降级触发项。"
+            ? "所有分项均 ≥ 85，没有额外降级触发项。"
             : degraders.map((component) => `${component.label}=${component.value}`).join(" · ")}
         </p>
       </div>

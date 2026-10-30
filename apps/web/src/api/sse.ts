@@ -45,6 +45,7 @@ export class JobEventStream {
   private closed = false;
   private lastEventId: string | null = null;
   private authRetried = false;
+  private sawTerminal = false;
   private readonly options: Required<Omit<StreamOptions, "onExhausted">> & Pick<StreamOptions, "onExhausted">;
 
   constructor(
@@ -66,6 +67,7 @@ export class JobEventStream {
 
   start(): void {
     this.closed = false;
+    this.sawTerminal = false;
     void this.connect();
   }
 
@@ -111,8 +113,13 @@ export class JobEventStream {
       this.authRetried = false;
       this.callbacks.onStatus("open");
       await this.consume(response.body);
-      // Server closed the stream deliberately (terminal event or heartbeat end).
+      // A terminal event closes the stream deliberately; anything else is an
+      // interrupted live feed and must reconnect (or degrade to polling).
       if (!this.closed) {
+        if (!this.sawTerminal) {
+          this.scheduleRetry("事件流在终态前关闭");
+          return;
+        }
         this.closed = true;
         this.callbacks.onStatus("closed");
       }
@@ -187,6 +194,7 @@ export class JobEventStream {
     this.lastEventId = event.id;
     this.callbacks.onEvent(event);
     if (event.type === "job.succeeded" || event.type === "job.failed") {
+      this.sawTerminal = true;
       this.callbacks.onTerminal?.(event);
     }
   }

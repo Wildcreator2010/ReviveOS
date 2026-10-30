@@ -6,6 +6,7 @@ import ast
 import configparser
 import re
 from pathlib import PurePosixPath
+from typing import Any
 
 from ..evidence import EvidenceItem, EvidenceReference, ExtractContext, inference_warning
 from .common import (
@@ -46,9 +47,9 @@ def _extract_setup_py(rel_path: str, text: str, ctx: ExtractContext) -> list[Evi
     call = _calls_setup(tree)
     if call is None:
         return []
-    facts: dict = {}
+    facts: dict[str, Any] = {}
     warnings: list[str] = []
-    deps: list[dict] = []
+    deps: list[dict[str, Any]] = []
     classifiers: list[str] = []
     python_requires_raw: str | None = None
 
@@ -108,8 +109,8 @@ def _extract_setup_cfg(rel_path: str, text: str, ctx: ExtractContext) -> list[Ev
         parser.read_string(text)
     except configparser.Error as exc:
         return [inference_warning(rel_path, f"setup.cfg could not be parsed: {exc}", commit_sha=ctx.commit_sha)]
-    facts: dict = {}
-    deps: list[dict] = []
+    facts: dict[str, Any] = {}
+    deps: list[dict[str, Any]] = []
     classifiers: list[str] = []
     warnings: list[str] = []
 
@@ -139,7 +140,7 @@ def _extract_setup_cfg(rel_path: str, text: str, ctx: ExtractContext) -> list[Ev
         if python_classifiers:
             facts["python_classifiers"] = python_classifiers
     if parser.has_section("options.extras_require"):
-        extras: dict[str, list[dict]] = {}
+        extras: dict[str, list[dict[str, Any]]] = {}
         for extra, value in parser.items("options.extras_require"):
             entries = []
             for entry in _multiline(value):

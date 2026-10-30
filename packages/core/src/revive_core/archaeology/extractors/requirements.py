@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from pathlib import PurePosixPath
+from typing import Any
 
 from ..evidence import EvidenceItem, EvidenceReference, ExtractContext, inference_warning
 from .common import parse_requirement_line
@@ -52,7 +53,7 @@ def _join(rel_path: str, target: str) -> str:
 
 
 def _extract_file(rel_path: str, text: str, ctx: ExtractContext, *, depth: int) -> list[EvidenceItem]:
-    deps: list[dict] = []
+    deps: list[dict[str, Any]] = []
     includes: list[str] = []
     options: list[str] = []
     warnings: list[str] = []
@@ -90,7 +91,7 @@ def _extract_file(rel_path: str, text: str, ctx: ExtractContext, *, depth: int) 
             continue
         deps.append(dep)
 
-    facts: dict = {}
+    facts: dict[str, Any] = {}
     if deps:
         facts["dependencies"] = deps
     if includes:

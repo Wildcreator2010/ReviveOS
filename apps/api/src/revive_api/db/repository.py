@@ -16,13 +16,14 @@ import secrets
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from ..store import (
+    MAX_EVENT_REPLAY,
     ApiKeyRecord,
     CapsuleRecord,
     EvidenceRecord,
@@ -119,18 +120,28 @@ class ControlPlaneRepository:
         return self._to_user_record(row) if row else None
 
     async def authenticate(self, email: str, password: str) -> UserRecord | None:
-        from ..security import verify_password
+        from ..security import dummy_verify, verify_password
 
         user = await self.user_by_email(email)
         if user is None:
+            await run_in_threadpool(dummy_verify, password)
             return None
         # Argon2 is CPU-bound; keep the event loop responsive under login load.
         if not await run_in_threadpool(verify_password, password, user.password_hash):
             return None
         return user
 
-    async def add_api_key(self, user_id: str, prefix: str, key_hash: str, label: str = "") -> ApiKeyRecord:
-        row = ApiKey(id=_id("api_key"), user_id=user_id, prefix=prefix, key_hash=key_hash, label=label)
+    async def add_api_key(
+        self, user_id: str, prefix: str, key_hash: str, label: str = "", expires_at: datetime | None = None
+    ) -> ApiKeyRecord:
+        row = ApiKey(
+            id=_id("api_key"),
+            user_id=user_id,
+            prefix=prefix,
+            key_hash=key_hash,
+            label=label,
+            expires_at=expires_at,
+        )
         self.session.add(row)
         await self.flush()
         return self._to_api_key_record(row)
@@ -162,7 +173,13 @@ class ControlPlaneRepository:
         from ..security import verify_api_key
 
         rows = (
-            await self.session.scalars(select(ApiKey).where(ApiKey.revoked_at.is_(None), ApiKey.prefix == token[:8]))
+            await self.session.scalars(
+                select(ApiKey).where(
+                    ApiKey.revoked_at.is_(None),
+                    ApiKey.prefix == token[:8],
+                    or_(ApiKey.expires_at.is_(None), ApiKey.expires_at > _now()),
+                )
+            )
         ).all()
         for row in rows:
             if await run_in_threadpool(verify_api_key, token, row.key_hash):
@@ -252,6 +269,14 @@ class ControlPlaneRepository:
         if fields:
             await self.session.execute(update(Job).where(Job.id == job_id).values(**fields))
 
+    async def claim_job(self, job_id: str) -> bool:
+        """Atomically move a queued job to running; duplicate deliveries lose."""
+
+        result = await self.session.execute(
+            update(Job).where(Job.id == job_id, Job.status.in_(("queued", "cancel_requested"))).values(status="running")
+        )
+        return bool(cast("CursorResult[Any]", result).rowcount)
+
     async def active_jobs(self, user_id: str) -> list[JobRecord]:
         rows = (
             await self.session.scalars(
@@ -311,9 +336,11 @@ class ControlPlaneRepository:
             await self.session.scalars(
                 select(JobEvent)
                 .where(JobEvent.job_id == job_id, JobEvent.sequence > after_sequence)
-                .order_by(JobEvent.sequence)
+                .order_by(JobEvent.sequence.desc())
+                .limit(MAX_EVENT_REPLAY)
             )
         ).all()
+        rows = list(reversed(rows))
         return [
             JobEventRecord(
                 id=row.id,
@@ -671,6 +698,7 @@ class ControlPlaneRepository:
             label=row.label,
             created_at=_utc(row.created_at),
             revoked_at=_utc(row.revoked_at) if row.revoked_at else None,
+            expires_at=_utc(row.expires_at) if row.expires_at else None,
         )
 
     @staticmethod

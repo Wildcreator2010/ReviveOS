@@ -29,3 +29,9 @@ def test_underreported_file_count_is_refused() -> None:
 
 def test_small_diff_stays_valid() -> None:
     assert validate_proposal(PatchProposal(diff=_one_file("app.py"))) is None
+
+
+def test_patch_cannot_modify_tests_or_their_configuration() -> None:
+    for name in ("tests/test_app.py", "legacy_test.py", "conftest.py", "pytest.ini"):
+        refusal = validate_proposal(PatchProposal(diff=_one_file(name)))
+        assert refusal is not None and "test" in refusal.lower()

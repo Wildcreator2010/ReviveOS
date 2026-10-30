@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiError, apiBaseUrl, apiDelete, apiGet, apiPost, setApiBaseUrl } from "../../src/api/client";
+import { ApiError, apiBaseUrl, apiDelete, apiGet, apiPost, clearSession, setApiBaseUrl } from "../../src/api/client";
 import { asRecord, pickNum, str } from "../../src/api/domain";
 import { readApiKeys } from "../../src/api/readers";
 import { describeApiError } from "../../src/api/useApi";
@@ -14,13 +14,22 @@ import { ModelProviderSection } from "../../src/features/settings/ModelProviderS
 
 function ApiEndpointField() {
   const desktop = useDesktopSettings();
+  const queryClient = useQueryClient();
   const [draft, setDraft] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const value = draft ?? desktop.apiBaseUrl ?? apiBaseUrl();
 
+  function clearForEndpointChange(next: string) {
+    const current = desktop.apiBaseUrl ?? apiBaseUrl();
+    if (next === current) return;
+    clearSession();
+    queryClient.clear();
+  }
+
   async function save() {
     const next = (draft ?? value).trim();
     if (next.length === 0) return;
+    clearForEndpointChange(next);
     if (desktop.available) {
       await desktop.setApiBaseUrl(next);
     } else {
@@ -50,6 +59,8 @@ function ApiEndpointField() {
           className="btn btn-ghost"
           onClick={() => {
             setDraft(null);
+            clearSession();
+            queryClient.clear();
             setApiBaseUrl(null);
             if (desktop.available) void desktop.setApiBaseUrl("");
           }}

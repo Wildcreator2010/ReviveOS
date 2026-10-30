@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 import revive_core.gitutil as core_git
+from revive_core.sandbox.patch_flow import protected_patch_reason
 
 from ..diffutil import (
     DiffError,
@@ -282,6 +283,9 @@ def validate_proposal(
             proposal.signature,
         )
     for path in derived:
+        reason = protected_patch_reason(path)
+        if reason is not None:
+            return Refused(reason, proposal.signature)
         if Path(path).name.lower() in _DEP_FILE_NAMES:
             removed_lines: set[str] = set()
             added_lines: set[str] = set()

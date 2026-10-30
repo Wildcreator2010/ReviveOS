@@ -24,6 +24,7 @@ from typing import Any, Protocol, runtime_checkable
 # --------------------------------------------------------------------------
 SANDBOX_USER = "1000:1000"
 TMPFS_SPEC = "rw,noexec,nosuid,size=256m"
+WORKSPACE_TMPFS_SPEC = "rw,nosuid,nodev,size=512m"
 LABEL_KEY = "revive.job_id"
 NETWORK_DISABLED = True
 NO_NEW_PRIVILEGES = True
@@ -273,6 +274,7 @@ def write_artifact(
 __all__ = [
     "SANDBOX_USER",
     "TMPFS_SPEC",
+    "WORKSPACE_TMPFS_SPEC",
     "LABEL_KEY",
     "NETWORK_DISABLED",
     "NO_NEW_PRIVILEGES",

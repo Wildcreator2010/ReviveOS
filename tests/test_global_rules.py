@@ -72,6 +72,14 @@ def test_high_entropy_provider_key_pattern_is_detected(tmp_path: Path) -> None:
     assert "SECRET-GITHUB" in rules_of(checker.scan(tmp_path))
 
 
+def test_dockerfile_variants_and_proxy_configs_are_scanned(tmp_path: Path) -> None:
+    seed_tree(tmp_path)
+    secret = "sk-" + "abcdef123456"
+    for name in ("Dockerfile.api", "Caddyfile", "web-nginx.conf"):
+        (tmp_path / name).write_text(f'API_KEY="{secret}"\n', encoding="utf-8")
+    assert "SECRET-ASSIGNMENT" in rules_of(checker.scan(tmp_path))
+
+
 def test_empty_placeholders_are_allowed(tmp_path: Path) -> None:
     seed_tree(tmp_path)
     (tmp_path / ".env.example").write_text(

@@ -23,7 +23,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import httpx
 import structlog
@@ -68,6 +68,8 @@ class JobStore(Protocol):
     async def get_job(self, job_id: str) -> JobRecord | None: ...
 
     async def update_job(self, job_id: str, **fields: Any) -> None: ...
+
+    async def claim_job(self, job_id: str) -> bool: ...
 
 
 class ExecutionFactory(Protocol):
@@ -154,7 +156,12 @@ async def execute_job(
     if job.status in TERMINAL_JOB_STATES:
         return PipelineResult(job_id=job_id, status=job.status, skipped="already_terminal")
 
-    await store.update_job(job_id, status="running")
+    claim = getattr(store, "claim_job", None)
+    if callable(claim):
+        if not await claim(job_id):
+            return PipelineResult(job_id=job_id, status=job.status, skipped="already_running")
+    else:
+        await store.update_job(job_id, status="running")
 
     pipeline_config = dict(job.metadata.get("pipeline") or {})
     stage_timeout = float(pipeline_config.get("timeout_seconds") or timeout)
@@ -234,6 +241,7 @@ async def _materialise_source(job: JobRecord, work_root: Path | None) -> Path:
         path = Path(str(staged))
         if not path.is_dir():
             raise FileNotFoundError(f"staged source path is missing: {path}")
+        _enforce_repo_size(job, path)
         return path
     repo_url = str(job.metadata.get("repo_url") or "").strip()
     if not repo_url:
@@ -241,9 +249,31 @@ async def _materialise_source(job: JobRecord, work_root: Path | None) -> Path:
     root = work_root or Path.cwd() / ".revive-tmp"
     destination = root / f"revive-source-{job.id}"
     if destination.exists() and any(destination.iterdir()):
+        _enforce_repo_size(job, destination)
         return destination
     mirror = fetch_repo(repo_url, destination)
+    _enforce_repo_size(job, mirror.path)
     return mirror.path
+
+
+def _enforce_repo_size(job: JobRecord, source: Path) -> None:
+    pipeline = job.metadata.get("pipeline") or {}
+    max_repo_mb = pipeline.get("max_repo_mb")
+    if not max_repo_mb:
+        return
+    limit = float(max_repo_mb) * 1024 * 1024
+    total = 0
+    for entry in source.rglob("*"):
+        try:
+            if entry.is_symlink() or not entry.is_file():
+                continue
+            total += entry.stat().st_size
+        except OSError:
+            continue
+        if total > limit:
+            raise ValueError(f"repository exceeds the configured size limit ({max_repo_mb} MB)")
+    if total > limit:  # pragma: no cover - covered by the incremental check
+        raise ValueError(f"repository exceeds the configured size limit ({max_repo_mb} MB)")
 
 
 _PACKAGE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -621,7 +651,7 @@ class PostgresEventSink:
     async def add_event(self, job_id: str, event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         record = await self.repository.add_event(job_id, event_type, payload)
         await self.repository.commit()
-        return record.as_dict()
+        return cast(dict[str, Any], record.as_dict())
 
     async def history(self, job_id: str, after_id: str | None) -> list[dict[str, Any]]:
         records = await self.repository.events_for_job(job_id, sequence_of(after_id))
@@ -640,11 +670,16 @@ class PostgresJobStore:
 
     async def get_job(self, job_id: str) -> JobRecord | None:
         await self.repository.commit()
-        return await self.repository.get_job(job_id)
+        return cast(JobRecord | None, await self.repository.get_job(job_id))
 
     async def update_job(self, job_id: str, **fields: Any) -> None:
         await self.repository.update_job(job_id, **fields)
         await self.repository.commit()
+
+    async def claim_job(self, job_id: str) -> bool:
+        claimed = await self.repository.claim_job(job_id)
+        await self.repository.commit()
+        return bool(claimed)
 
     async def set_job_metadata(self, job_id: str, **values: Any) -> None:
         await self.repository.set_job_metadata(job_id, **values)
@@ -686,7 +721,7 @@ async def run_with_production_ports(
 
     engine = create_async_engine(config.database_url)
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    client = aioredis.from_url(redis_url(config))
+    client = aioredis.from_url(redis_url(config))  # type: ignore[no-untyped-call]
     try:
         async with session_factory() as session:
             repository = ControlPlaneRepository(session)
@@ -705,7 +740,7 @@ async def run_with_production_ports(
         await engine.dispose()
 
 
-@celery_app.task(bind=True, name=TASK_PIPELINE)
+@celery_app.task(bind=True, name=TASK_PIPELINE)  # type: ignore[untyped-decorator]
 def run_resurrection_job(self: Any, job_id: str) -> dict[str, Any]:
     """Celery entry point: one job per task, idempotent because the state decides."""
 

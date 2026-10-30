@@ -79,6 +79,25 @@ async def test_openai_default_base_url_is_openai():
     assert captured["url"] == "https://api.openai.com/v1/chat/completions"
 
 
+def test_custom_provider_rejects_plaintext_non_loopback_base_url():
+    with pytest.raises(LLMError):
+        OpenAIProvider("k", "m", "http://llm.example/v1", provider_name="custom")
+
+
+def test_custom_provider_allows_loopback_http_base_url():
+    provider = OpenAIProvider("k", "m", "http://127.0.0.1:8000/v1", provider_name="custom")
+    assert provider.base_url == "http://127.0.0.1:8000/v1"
+
+
+async def test_oversized_provider_response_is_rejected(monkeypatch):
+    monkeypatch.setattr("revive_agents.llm._http.MAX_RESPONSE_BYTES", 10)
+    client = mock_client(lambda request: httpx.Response(200, json=openai_body("x" * 100)))
+    provider = OpenAIProvider("k", "m", client=client)
+    with pytest.raises(LLMError, match="size"):
+        await provider.complete([{"role": "user", "content": "x"}])
+    await client.aclose()
+
+
 async def test_openai_reasoning_effort_is_forwarded():
     captured = {}
 

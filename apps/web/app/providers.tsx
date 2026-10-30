@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiError, apiGet, clearSession, hasSession } from "../src/api/client";
@@ -10,6 +10,17 @@ function DesktopApiBootstrap() {
   // On every page, not just settings: the renderer must know the configured API
   // base URL before the first request leaves the app.
   useDesktopSettings();
+  return null;
+}
+
+function SessionCacheReset() {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    // Token rotation reuses setSession; only identity changes may expose another user's cached data.
+    const reset = () => queryClient.clear();
+    window.addEventListener("revive-identity", reset);
+    return () => window.removeEventListener("revive-identity", reset);
+  }, [queryClient]);
   return null;
 }
 
@@ -76,6 +87,7 @@ export function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <QueryClientProvider client={client}>
+      <SessionCacheReset />
       <DesktopApiBootstrap />
       <AuthGate>{children}</AuthGate>
     </QueryClientProvider>

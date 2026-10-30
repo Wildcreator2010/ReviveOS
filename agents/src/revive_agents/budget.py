@@ -15,6 +15,7 @@ from typing import Any
 from .llm.base import BudgetExceeded, Usage
 
 DEFAULT_JOB_BUDGET_USD = 2.0
+DEFAULT_JOB_MAX_CALLS = 64
 
 
 def default_limit() -> float:
@@ -27,11 +28,22 @@ def default_limit() -> float:
         return DEFAULT_JOB_BUDGET_USD
 
 
+def default_max_calls() -> int:
+    raw = os.getenv("REVIVE_LLM__JOB_MAX_CALLS")
+    if raw is None or raw == "":
+        return DEFAULT_JOB_MAX_CALLS
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return DEFAULT_JOB_MAX_CALLS
+
+
 class JobBudget:
     """Mutable per-job accumulator; call 'charge' after each LLM call."""
 
-    def __init__(self, limit: float | None = None, *, job_id: str = "") -> None:
+    def __init__(self, limit: float | None = None, *, job_id: str = "", max_calls: int | None = None) -> None:
         self.limit = default_limit() if limit is None else float(limit)
+        self.max_calls = default_max_calls() if max_calls is None else max(1, int(max_calls))
         self.job_id = job_id
         self.spent = 0.0
         self.calls = 0
@@ -42,11 +54,13 @@ class JobBudget:
 
     @property
     def exceeded(self) -> bool:
-        return self.spent > self.limit
+        return self.spent > self.limit or self.calls >= self.max_calls
 
     def charge(self, usage: Any) -> float:
         self.spent += float(Usage.coerce(usage).cost_usd_estimate)
         self.calls += 1
+        if self.calls > self.max_calls:
+            raise BudgetExceeded(f"LLM job call budget {self.max_calls} exceeded")
         if self.spent > self.limit:
             raise BudgetExceeded(f"LLM job budget {self.limit:.4f} exceeded (spent {self.spent:.4f})")
         return self.spent
@@ -69,6 +83,8 @@ class BudgetedProvider:
         timeout: float = 30.0,
         reasoning_effort: str | None = None,
     ) -> Any:
+        if self.budget.calls >= self.budget.max_calls:
+            raise BudgetExceeded(f"LLM job call budget {self.budget.max_calls} is already exhausted")
         if self.budget.spent >= self.budget.limit:
             raise BudgetExceeded(f"LLM job budget {self.budget.limit:.4f} is already exhausted")
         completion = await self.provider.complete(

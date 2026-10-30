@@ -12,6 +12,12 @@ import { isTerminal } from "../../api/events";
 export const MAX_EVENTS = 2000;
 const RENDER_WINDOW = 500;
 
+function terminalStatus(event: JobEvent): JobStatus {
+  const status = event.payload.status;
+  if (status === "cancelled" || status === "succeeded" || status === "failed") return status;
+  return event.type === "job.succeeded" ? "succeeded" : "failed";
+}
+
 export interface JobEventsState {
   events: JobEvent[];
   visible: JobEvent[];
@@ -84,7 +90,7 @@ export function useJobEvents(jobId: string): JobEventsState {
         },
         onTerminal: (event) => {
           setTerminal(event);
-          setJobStatus(event.type === "job.succeeded" ? "succeeded" : "failed");
+          setJobStatus(terminalStatus(event));
         },
       },
       {
@@ -117,7 +123,7 @@ export function useJobEvents(jobId: string): JobEventsState {
           push(event);
           if (isTerminal(event.type)) {
             setTerminal(event);
-            setJobStatus(event.type === "job.succeeded" ? "succeeded" : "failed");
+            setJobStatus(terminalStatus(event));
           }
         }
         if (Array.isArray(payload) && payload.length > 0) return;

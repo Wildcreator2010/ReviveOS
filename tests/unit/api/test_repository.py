@@ -42,6 +42,7 @@ async def test_list_api_keys_filters_by_user_and_maps_revocation_fields() -> Non
             label="first",
             created_at=created,
             revoked_at=None,
+            expires_at=None,
         ),
         SimpleNamespace(
             id="key_2",
@@ -51,6 +52,7 @@ async def test_list_api_keys_filters_by_user_and_maps_revocation_fields() -> Non
             label="second",
             created_at=created,
             revoked_at=revoked,
+            expires_at=None,
         ),
     ]
     session = FakeSession(rows)

@@ -145,7 +145,7 @@ jobs:
         if: matrix.name == 'web'
         run: |
           set -euo pipefail
-          docker run -d --name revive-web-smoke -p 8080:80 reviveos/web:ci
+          docker run -d --name revive-web-smoke -p 8080:8080 reviveos/web:ci
           for attempt in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8080/ | grep -q 'ReviveOS'; then
               echo "console served after ${attempt}s"

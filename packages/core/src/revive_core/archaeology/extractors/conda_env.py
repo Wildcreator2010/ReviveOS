@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import PurePosixPath
+from typing import Any
 
 import yaml
 
@@ -18,7 +19,7 @@ def matches(rel_path: str) -> bool:
     return PurePosixPath(rel_path).name.lower() in _NAMES
 
 
-def _conda_dep(entry: str, *, source: str) -> dict | None:
+def _conda_dep(entry: str, *, source: str) -> dict[str, Any] | None:
     text = entry.strip()
     if not text:
         return None
@@ -40,7 +41,7 @@ def extract(rel_path: str, text: str, ctx: ExtractContext) -> list[EvidenceItem]
     if not isinstance(data, dict):
         return [inference_warning(rel_path, "environment.yml is not a mapping", commit_sha=ctx.commit_sha)]
 
-    deps: list[dict] = []
+    deps: list[dict[str, Any]] = []
     warnings: list[str] = []
     for entry in data.get("dependencies") or []:
         if isinstance(entry, str):
@@ -59,7 +60,7 @@ def extract(rel_path: str, text: str, ctx: ExtractContext) -> list[EvidenceItem]
                     else:
                         deps.append(parsed)
 
-    facts: dict = {}
+    facts: dict[str, Any] = {}
     if deps:
         facts["dependencies"] = deps
     for dep in deps:

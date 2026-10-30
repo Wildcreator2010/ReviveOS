@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
+import pytest
 from revive_core.archaeology.evidence import extract_evidence
 
 
@@ -52,3 +54,32 @@ def test_golden_py27_flask_evidence(golden_repos: Path):
     assert deps["flask"] == "0.12.2"
     docker = next(item for item in items if item.reference.file == "Dockerfile")
     assert docker.facts["base_image"] == "python:2.7-slim"
+
+
+def test_included_requirements_cannot_read_outside_the_repository(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    outside = tmp_path / "outside-requirements.txt"
+    outside.write_text("HOST_SECRET_TOKEN==9.9.9\n", encoding="utf-8")
+    (repo / "requirements.txt").write_text("-r ../outside-requirements.txt\n", encoding="utf-8")
+
+    items = extract_evidence(repo)
+
+    assert "HOST_SECRET_TOKEN" not in str([item.model_dump() for item in items])
+    assert not any(item.reference.file == "../outside-requirements.txt" for item in items)
+
+
+def test_symlinked_manifest_cannot_read_outside_the_repository(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    outside = tmp_path / "outside-requirements.txt"
+    outside.write_text("HOST_SECRET_TOKEN==9.9.9\n", encoding="utf-8")
+    link = repo / "requirements.txt"
+    try:
+        os.symlink(outside, link)
+    except OSError as exc:  # pragma: no cover - Windows without symlink privilege
+        pytest.skip(f"symlinks unavailable: {exc}")
+
+    items = extract_evidence(repo)
+
+    assert "HOST_SECRET_TOKEN" not in str([item.model_dump() for item in items])

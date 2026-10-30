@@ -5,6 +5,7 @@ from __future__ import annotations
 import configparser
 import re
 from pathlib import PurePosixPath
+from typing import Any
 
 import yaml
 
@@ -161,7 +162,7 @@ def _extract_tox(rel_path: str, text: str, ctx: ExtractContext) -> list[Evidence
             if normalized:
                 values.append(normalized)
     versions = sort_python_versions(values)
-    facts: dict = {"envlist": envlist, "ci_system": "tox"}
+    facts: dict[str, Any] = {"envlist": envlist, "ci_system": "tox"}
     if versions:
         facts["python_versions"] = versions
     if not envlist and not versions:

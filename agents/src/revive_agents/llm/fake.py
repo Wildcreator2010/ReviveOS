@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, cast
 
 from .base import (
     Completion,
@@ -99,10 +99,10 @@ class FakeProvider:
         if responder is None:
             return self.recordings.get(key)
         if callable(responder):
-            return responder(messages)
+            return cast(ReplayValue, responder(messages))
         if isinstance(responder, list):
-            return responder.pop(0) if responder else None
-        return responder
+            return cast(ReplayValue | None, responder.pop(0)) if responder else None
+        return cast(ReplayValue, responder)
 
     # -- provider protocol ----------------------------------------------
     async def complete(

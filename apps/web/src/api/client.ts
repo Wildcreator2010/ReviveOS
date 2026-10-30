@@ -108,11 +108,18 @@ export function clearSession(): void {
   storageSet(ACCESS_TOKEN_KEY, null);
   storageSet(REFRESH_TOKEN_KEY, null);
   notifySession();
+  notifyIdentityChanged();
 }
 
 function notifySession(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("revive-session"));
+}
+
+/** Identity changed (login/logout/base URL), as opposed to a routine token rotation. */
+export function notifyIdentityChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("revive-identity"));
 }
 
 export function getAccessToken(): string | null {

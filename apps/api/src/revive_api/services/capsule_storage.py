@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any, Protocol
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -16,6 +17,8 @@ class CapsuleStorage(Protocol):
 
     async def put(self, key: str, content: bytes) -> None: ...
     async def get(self, key: str) -> bytes: ...
+    async def exists(self, key: str) -> bool: ...
+    def stream(self, key: str) -> AsyncIterator[bytes]: ...
     async def delete(self, key: str) -> None: ...
 
 
@@ -44,7 +47,7 @@ class S3CapsuleStorage:
         path = f"/{quote(self.bucket, safe='')}/{quote(key, safe='/')}"
         url = self.endpoint + path
         payload_hash = hashlib.sha256(content).hexdigest()
-        host = httpx.URL(url).host
+        host = urlsplit(url).netloc
         host_header = host
         headers = {
             "host": host_header,
@@ -86,6 +89,28 @@ class S3CapsuleStorage:
             response.raise_for_status()
             return response.content
 
+    async def exists(self, key: str) -> bool:
+        url, headers = self._signed_headers("HEAD", key)
+        async with httpx.AsyncClient(**self.CLIENT_OPTIONS) as client:
+            response = await client.head(url, headers=headers)
+            if response.status_code == 404:
+                return False
+            response.raise_for_status()
+            return True
+
+    async def _stream(self, key: str) -> AsyncIterator[bytes]:
+        url, headers = self._signed_headers("GET", key)
+        async with httpx.AsyncClient(**self.CLIENT_OPTIONS) as client:
+            async with client.stream("GET", url, headers=headers) as response:
+                if response.status_code == 404:
+                    raise FileNotFoundError(key)
+                response.raise_for_status()
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+
+    def stream(self, key: str) -> AsyncIterator[bytes]:
+        return self._stream(key)
+
     async def delete(self, key: str) -> None:
         url, headers = self._signed_headers("DELETE", key)
         async with httpx.AsyncClient(**self.CLIENT_OPTIONS) as client:
@@ -108,6 +133,18 @@ class MemoryCapsuleStorage:
             return self.objects[key]
         except KeyError:
             raise FileNotFoundError(key) from None
+
+    async def exists(self, key: str) -> bool:
+        return key in self.objects
+
+    async def _stream(self, key: str) -> AsyncIterator[bytes]:
+        try:
+            yield self.objects[key]
+        except KeyError:
+            raise FileNotFoundError(key) from None
+
+    def stream(self, key: str) -> AsyncIterator[bytes]:
+        return self._stream(key)
 
     async def delete(self, key: str) -> None:
         self.objects.pop(key, None)

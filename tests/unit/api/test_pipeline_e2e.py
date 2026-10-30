@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 from revive_api.store import JobRecord
-from revive_api.tasks.pipeline import execute_job
+from revive_api.tasks.pipeline import _materialise_source, execute_job
 from revive_core.sandbox.executor import RunResult
 
 
@@ -88,3 +88,39 @@ async def test_execute_job_builds_and_reports_a_real_capsule(tmp_path: Path) -> 
     assert ref.startswith("file://")
     assert (tmp_path / "work" / f"{job.id}.revive").is_file()
     assert port.calls == ["build", "test"]
+
+
+class AlreadyClaimedStore(Store):
+    async def claim_job(self, job_id: str) -> bool:
+        return False
+
+
+@pytest.mark.asyncio
+async def test_duplicate_delivery_skips_an_already_claimed_job(tmp_path: Path) -> None:
+    job = JobRecord(id="rev_job_claimed", project_id="project-e2e", user_id="user-e2e")
+    store = AlreadyClaimedStore(job)
+    port = Port()
+
+    result = await execute_job(
+        job.id,
+        store=store,
+        events=Events(),
+        execution_factory=lambda job_id, path: port,
+        provider=object(),
+        work_root=tmp_path / "work",
+    )
+
+    assert result.skipped == "already_running"
+    assert port.calls == []
+
+
+@pytest.mark.asyncio
+async def test_materialised_source_enforces_the_server_side_size_limit(tmp_path: Path) -> None:
+    source = tmp_path / "repo"
+    source.mkdir()
+    (source / "large.bin").write_bytes(b"x" * 4096)
+    job = JobRecord(id="rev_job_large", project_id="project-e2e", user_id="user-e2e")
+    job.metadata = {"source_path": str(source), "pipeline": {"max_repo_mb": 0.001}}
+
+    with pytest.raises(ValueError, match="size limit"):
+        await _materialise_source(job, None)

@@ -38,6 +38,9 @@ class Config:
     max_repo_mb: int = 200
     login_failure_limit: int = 5
     login_lockout_minutes: int = 15
+    api_key_ttl_days: int = 90
+    max_request_bytes: int = 2 * 1024 * 1024
+    max_capsule_bytes: int = 64 * 1024 * 1024
     capsule_presign_seconds: int = 60
     s3_endpoint: str = ""
     s3_access_key: str = ""
@@ -67,6 +70,9 @@ class Config:
             max_repo_mb=_int_env("REVIVE_QUOTA__MAX_REPO_MB", 200),
             login_failure_limit=_int_env("REVIVE_RATE__LOGIN_FAILURE_LIMIT", 5),
             login_lockout_minutes=_int_env("REVIVE_RATE__LOGIN_LOCKOUT_MINUTES", 15),
+            api_key_ttl_days=_int_env("REVIVE_API_KEY__TTL_DAYS", 90),
+            max_request_bytes=_int_env("REVIVE_HTTP__MAX_REQUEST_BYTES", 2 * 1024 * 1024),
+            max_capsule_bytes=_int_env("REVIVE_HTTP__MAX_CAPSULE_BYTES", 64 * 1024 * 1024),
             capsule_presign_seconds=_int_env("REVIVE_STORAGE__PRESIGN_SECONDS", 60),
             s3_endpoint=os.getenv("S3_ENDPOINT", ""),
             s3_access_key=os.getenv("S3_ACCESS_KEY", ""),
@@ -74,6 +80,13 @@ class Config:
             s3_bucket=os.getenv("S3_BUCKET", ""),
             s3_region=os.getenv("S3_REGION", "us-east-1"),
         )
-        if config.jwt_access_minutes < 1 or config.jwt_refresh_days < 1 or config.worker_token == "":
-            raise ValueError("JWT lifetimes and worker token must be positive")
+        if (
+            config.jwt_access_minutes < 1
+            or config.jwt_refresh_days < 1
+            or config.worker_token == ""
+            or config.max_request_bytes <= 0
+            or config.max_capsule_bytes <= 0
+            or config.api_key_ttl_days < 0
+        ):
+            raise ValueError("JWT lifetimes, worker token and request limits must be positive")
         return config

@@ -1,9 +1,20 @@
 {$REVIVE_DOMAIN:localhost} {
-  encode gzip
-  handle /api/* {
+  encode gzip zstd
+  request_body {
+    max_size 64MB
+  }
+  handle /healthz {
     reverse_proxy api:8000
   }
+  handle /readyz {
+    reverse_proxy api:8000
+  }
+  handle /api/* {
+    reverse_proxy api:8000 {
+      header_up X-Forwarded-For {remote_host}
+    }
+  }
   handle {
-    reverse_proxy web:80
+    reverse_proxy web:8080
   }
 }

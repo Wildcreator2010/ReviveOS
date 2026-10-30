@@ -10,10 +10,20 @@ import jwt
 from argon2 import PasswordHasher
 
 _passwords = PasswordHasher()
+_DUMMY_HASH: str | None = None
 
 
 def hash_password(value: str) -> str:
     return _passwords.hash(value)
+
+
+def dummy_verify(value: str) -> None:
+    """Spend the same Argon2 work for unknown accounts to blunt user enumeration."""
+
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = _passwords.hash("reviveos-dummy-password")
+    verify_password(value, _DUMMY_HASH)
 
 
 def verify_password(value: str, hashed: str) -> bool:

@@ -430,6 +430,13 @@ def verify_capsule_structure(path: str | Path) -> dict[str, Any]:
         return report
     expected = digests.get("entries", {})
     bad: list[str] = []
+    sbom_digest = manifest.get("sbom_digest")
+    if isinstance(sbom_digest, str) and sbom_digest:
+        sbom_payload = members.get(layout.SBOM)
+        if sbom_payload is None:
+            bad.append(f"{layout.SBOM}:missing")
+        elif hashlib.sha256(sbom_payload).hexdigest() != sbom_digest:
+            bad.append(f"{layout.SBOM}:manifest sbom_digest mismatch")
     for name, digest in expected.items():
         payload = members.get(name)
         if payload is None:

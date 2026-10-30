@@ -107,7 +107,7 @@ class PypiVersionProvider:
             return []
         releases = self.client.versions_before(name, cutoff)
         versions: list[str] = []
-        for release in releases:
+        for release in reversed(releases):
             version = getattr(release, "version", None) or str(release)
             if version not in versions:
                 versions.append(version)

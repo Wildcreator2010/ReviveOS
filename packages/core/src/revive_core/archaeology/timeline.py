@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -32,7 +33,7 @@ class Snapshot:
         return items[0] if items else None
 
 
-class Timeline(list):
+class Timeline(list[Snapshot]):
     """A list of Snapshot with the extra derived fields from the contract."""
 
     def __init__(self, snapshots: list[Snapshot] | None = None) -> None:
@@ -61,7 +62,7 @@ def _git_show(repo: Path, sha: str, path: str) -> str | None:
     return result.stdout
 
 
-def discover_watched_paths(mirror) -> list[str]:
+def discover_watched_paths(mirror: Any) -> list[str]:
     """Tracked files that any extractor would care about."""
 
     from .extractors import matching_modules
@@ -140,7 +141,7 @@ def _death_candidates(repo: Path) -> list[tuple[str, datetime]]:
     return sorted(candidates, key=lambda item: item[1])
 
 
-def build_timeline(mirror, watched_paths: list[str] | None = None) -> Timeline:
+def build_timeline(mirror: Any, watched_paths: list[str] | None = None) -> Timeline:
     """Return chronological snapshots for the watched manifest/CI paths."""
 
     repo = Path(mirror.path)

@@ -31,11 +31,32 @@ class FailingRebuilder:
         raise RuntimeError("rebuild failed")
 
 
-def _patch_structural_verification(monkeypatch: pytest.MonkeyPatch) -> None:
+class UnverifiedRebuilder:
+    name = "test"
+
+    async def rebuild(self, capsule_dir: Path):
+        return verify_module.RebuildResult(ok=True, behavior_rematch=None)
+
+
+class ScoreMismatchRebuilder:
+    name = "test"
+
+    async def rebuild(self, capsule_dir: Path):
+        return verify_module.RebuildResult(ok=True, behavior_rematch=True, score_reproduced=70.0)
+
+
+def _patch_structural_verification(monkeypatch: pytest.MonkeyPatch, manifest: dict | None = None) -> None:
     monkeypatch.setattr(
         verify_module,
         "verify_capsule_structure",
-        lambda capsule: {"manifest_ok": True, "digests_ok": True, "errors": [], "missing": [], "bad_entries": []},
+        lambda capsule: {
+            "manifest_ok": True,
+            "digests_ok": True,
+            "errors": [],
+            "missing": [],
+            "bad_entries": [],
+            "manifest": manifest or {},
+        },
     )
 
     def extract(capsule: str | Path, destination: str | Path) -> dict[str, Path]:
@@ -80,3 +101,41 @@ async def test_verify_removes_rebuild_workspace_after_error(monkeypatch: pytest.
 
     assert rebuilder.workdir is not None
     assert not rebuilder.workdir.exists()
+
+
+@pytest.mark.asyncio
+async def test_missing_behavior_rematch_is_not_reported_as_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_structural_verification(monkeypatch)
+
+    report = await verify_module.verify("capsule.revive", rebuilder=UnverifiedRebuilder())
+
+    assert report.verified is False
+    assert report.exit_code == verify_module.EXIT_CORRUPT
+    assert any("behavior" in error for error in report.errors)
+
+
+@pytest.mark.asyncio
+async def test_score_mismatch_is_reported_as_corruption(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_structural_verification(monkeypatch, {"score": {"total": 80.0}})
+
+    report = await verify_module.verify(
+        "capsule.revive",
+        rebuilder=ScoreMismatchRebuilder(),
+        score_recompute=lambda manifest: 70.0,
+    )
+
+    assert report.verified is False
+    assert report.exit_code == verify_module.EXIT_CORRUPT
+    assert report.score_reproduced == 70.0
+    assert any("score" in error.lower() for error in report.errors)
+
+
+@pytest.mark.asyncio
+async def test_rebuilder_score_is_compared_without_a_recompute_callback(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_structural_verification(monkeypatch, {"score": {"total": 80.0}})
+
+    report = await verify_module.verify("capsule.revive", rebuilder=ScoreMismatchRebuilder())
+
+    assert report.verified is False
+    assert report.exit_code == verify_module.EXIT_CORRUPT
+    assert any("score" in error.lower() for error in report.errors)

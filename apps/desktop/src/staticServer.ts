@@ -58,9 +58,39 @@ export async function startStaticHost(root: string): Promise<StaticHost> {
   };
 }
 
+const SECURITY_HEADERS = {
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; font-src 'self' data:; connect-src 'self' http: https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+} as const;
+
 function handle(base: string, request: IncomingMessage, response: ServerResponse): void {
+  const hostHeader = (request.headers.host ?? "").toLowerCase();
+  const host = hostHeader.startsWith("[")
+    ? hostHeader.slice(0, hostHeader.indexOf("]") + 1)
+    : (hostHeader.split(":")[0] ?? "");
+  if (host && host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]") {
+    response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("403");
+    return;
+  }
   const rawPath = (request.url ?? "/").split("?")[0] ?? "/";
-  const decoded = decodeURIComponent(rawPath);
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(rawPath);
+  } catch {
+    response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("400");
+    return;
+  }
+  if (decoded.split(/[\\/]+/).some((segment) => segment === "..")) {
+    response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("400");
+    return;
+  }
   const safe = normalize(decoded).replace(/^([.][.][/\\])+/, "");
   const candidates = candidatePaths(base, safe);
   for (const candidate of candidates) {
@@ -73,12 +103,12 @@ function handle(base: string, request: IncomingMessage, response: ServerResponse
       "Content-Type": type,
       "Content-Length": stats.size,
       "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
+      ...SECURITY_HEADERS,
     });
     createReadStream(candidate).pipe(response);
     return;
   }
-  response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+  response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...SECURITY_HEADERS });
   response.end("404");
 }
 

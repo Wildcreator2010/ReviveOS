@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { ApiError, apiBaseUrl, setApiBaseUrl } from "../../src/api/client";
+import { ApiError, apiBaseUrl, clearSession, setApiBaseUrl } from "../../src/api/client";
 import { login, register } from "../../src/api/auth";
 import { desktopBridge } from "../../src/desktop/bridge";
 
@@ -19,6 +19,7 @@ export default function LoginPage() {
   async function applyApiBase(): Promise<void> {
     const next = apiBase.trim();
     if (!next) return;
+    if (next !== apiBaseUrl()) clearSession();
     setApiBaseUrl(next);
     try {
       window.localStorage.setItem("revive.apiBaseUrl", next);

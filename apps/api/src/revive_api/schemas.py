@@ -58,6 +58,7 @@ class ApiKeyResponse(BaseModel):
     key: str | None = None
     label: str | None = None
     created_at: datetime | None = None
+    expires_at: datetime | None = None
 
 
 class MeResponse(BaseModel):

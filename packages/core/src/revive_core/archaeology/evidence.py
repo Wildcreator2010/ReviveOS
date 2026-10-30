@@ -105,8 +105,17 @@ def _is_ignored(rel_path: str) -> bool:
 
 def _safe_read(root: Path, rel_path: str) -> str | None:
     try:
-        return (root / rel_path).read_text(encoding="utf-8", errors="replace")
-    except OSError:
+        base = root.resolve()
+        raw = root / rel_path
+        # A repository must not be able to point evidence reads outside its own tree.
+        if raw.is_symlink():
+            return None
+        candidate = raw.resolve()
+        candidate.relative_to(base)
+        if candidate.stat().st_size > MAX_FILE_BYTES:
+            return None
+        return candidate.read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
         return None
 
 
@@ -128,6 +137,7 @@ def extract_evidence(
     """Walk root and return evidence for every recognised manifest/CI/doc file."""
 
     base = Path(root)
+    base_resolved = base.resolve()
     ctx = ExtractContext(
         commit_sha=commit_sha,
         read_file=read_file or (lambda rel: _safe_read(base, rel)),
@@ -136,20 +146,22 @@ def extract_evidence(
     candidates = [base / p for p in paths] if paths is not None else sorted(base.rglob("*"))
     for path in candidates:
         try:
-            if not path.is_file():
+            if path.is_symlink() or not path.is_file():
                 continue
-        except OSError:  # pragma: no cover - defensive
+            resolved = path.resolve()
+            resolved.relative_to(base_resolved)
+        except (OSError, ValueError):  # pragma: no cover - defensive
             continue
         try:
-            rel_path = path.relative_to(base).as_posix()
-        except ValueError:
-            rel_path = path.as_posix()
+            rel_path = resolved.relative_to(base_resolved).as_posix()
+        except ValueError:  # pragma: no cover - already checked above
+            continue
         if _is_ignored(rel_path):
             continue
         try:
-            if path.stat().st_size > MAX_FILE_BYTES:
+            if resolved.stat().st_size > MAX_FILE_BYTES:
                 continue
-            text = path.read_text(encoding="utf-8", errors="replace")
+            text = resolved.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:
             log.warning("evidence.read_failed", file=rel_path, error=str(exc))
             items.append(inference_warning(rel_path, f"could not read file: {exc}"))

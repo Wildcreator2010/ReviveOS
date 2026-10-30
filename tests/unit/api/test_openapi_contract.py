@@ -52,3 +52,21 @@ def test_metrics_endpoint_renders_prometheus_text() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
     assert "revive_repair_success_ratio" in response.text
+
+
+def test_openapi_declares_auth_schemes_and_protected_operations() -> None:
+    document = _app().openapi()
+    schemes = document["components"]["securitySchemes"]
+    assert schemes["BearerAuth"]["scheme"] == "bearer"
+    assert schemes["ApiKeyAuth"]["name"] == "X-Revive-Key"
+    assert document["paths"]["/api/v1/jobs"]["get"]["security"] == [
+        {"BearerAuth": []},
+        {"ApiKeyAuth": []},
+    ]
+    assert "security" not in document["paths"]["/api/v1/auth/login"]["post"]
+    assert document["paths"]["/api/v1/jobs/{job_id}/capsule"]["post"]["security"] == [{"WorkerTokenAuth": []}]
+
+
+def test_capsule_download_documents_the_redirect() -> None:
+    operation = _app().openapi()["paths"]["/api/v1/capsules/{capsule_id}/download"]["get"]
+    assert "302" in operation["responses"]

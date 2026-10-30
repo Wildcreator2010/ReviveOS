@@ -223,6 +223,7 @@ def test_resurrect_limits_are_persisted_and_invalid_values_rejected(client: Test
     assert client.app.state.store.jobs[job_id].metadata["pipeline"] == {
         "budget_usd": 3.5,
         "timeout_seconds": 120,
+        "max_repo_mb": 200,
     }
 
     rejected = client.post(

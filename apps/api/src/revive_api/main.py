@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import hashlib
@@ -9,16 +10,16 @@ import hmac
 import os
 import secrets
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from revive_agents.llm import FakeProvider, from_config, from_settings
 from sse_starlette.sse import EventSourceResponse
@@ -31,7 +32,7 @@ from .db.uow import RequestControlPlane, SQLAlchemyUnitOfWorkMiddleware
 from .deps import Probe, readiness_probes, run_probe
 from .event_bus import HEARTBEAT_SECONDS, RedisEventBus, StoreEventBus, sse_frames
 from .login_throttle import LoginThrottle, MemoryLoginThrottle, RedisLoginThrottle
-from .middleware import RequestIdMiddleware
+from .middleware import BodySizeLimitMiddleware, RequestIdMiddleware
 from .schemas import (
     ApiKeyCreateRequest,
     ApiKeyResponse,
@@ -108,6 +109,14 @@ def _error_payload(request: Request, exc: ApiError) -> dict[str, Any]:
         request.state.request_id = request_id
     error["request_id"] = request_id
     return {"error": error}
+
+
+def _safe_validation_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
+    """Drop echoed input and exception objects from validation failures."""
+
+    return [
+        {key: value for key, value in dict(error).items() if key not in {"input", "ctx", "url"}} for error in errors
+    ]
 
 
 def _project_response(project: ProjectRecord) -> ProjectResponse:
@@ -210,6 +219,11 @@ def _llm_audit_view(value: Mapping[str, Any] | None) -> dict[str, Any]:
 
 T = TypeVar("T")
 R = TypeVar("R", bound=Response)
+_QUOTA_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _quota_lock(user_id: str) -> asyncio.Lock:
+    return _QUOTA_LOCKS.setdefault(user_id, asyncio.Lock())
 
 
 def _paginate(items: list[T], limit: int, cursor: str | None) -> tuple[list[T], str | None]:
@@ -285,14 +299,14 @@ async def _require_project(request: Request, project_id: str, user: UserRecord) 
     if not project:
         raise ApiError(404, "not_found", "project not found")
     _require_owner(request, user, project)
-    return project
+    return cast(ProjectRecord, project)
 
 
 async def _require_job(request: Request, job_id: str, user: UserRecord) -> JobRecord:
     job = await request.app.state.control_plane.get_job(job_id)
     if not job or job.user_id != user.id:
         raise ApiError(404, "not_found", "job not found")
-    return job
+    return cast(JobRecord, job)
 
 
 def _repo_size_mb(value: Any) -> int | None:
@@ -363,7 +377,7 @@ def create_app(
     capsule_storage: CapsuleStorage | None = None,
 ) -> FastAPI:
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if config.database_url:
             engine, sessions = engine_factory(config.database_url)
             app.state.db_engine = engine
@@ -373,7 +387,7 @@ def create_app(
                     raise ConfigurationError("production API requires REDIS_URL for the durable event bus")
                 import redis.asyncio as aioredis
 
-                app.state.redis_client = aioredis.from_url(config.redis_url)
+                app.state.redis_client = aioredis.from_url(config.redis_url)  # type: ignore[no-untyped-call]
                 app.state.events = RedisEventBus(
                     SessionEventSink(sessions),
                     app.state.redis_client,
@@ -395,6 +409,12 @@ def create_app(
                 await engine.dispose()
 
     app = FastAPI(title="ReviveOS API", version="v1", description="ReviveOS control-plane API", lifespan=lifespan)
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=config.max_request_bytes,
+        capsule_max_bytes=config.max_capsule_bytes,
+        worker_token=config.worker_token,
+    )
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -463,7 +483,13 @@ def create_app(
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         return await api_error_handler(
-            request, ApiError(422, "validation_error", "request validation failed", {"errors": exc.errors()})
+            request,
+            ApiError(
+                422,
+                "validation_error",
+                "request validation failed",
+                {"errors": _safe_validation_errors(exc.errors())},
+            ),
         )
 
     @app.get("/healthz", response_model=HealthResponse, tags=["health"])
@@ -509,8 +535,12 @@ def create_app(
 
     @app.post("/auth/login", response_model=TokenResponse, tags=["auth"])
     async def login(payload: LoginRequest, request: Request) -> TokenResponse:
-        key = payload.email.strip().lower()
-        retry_after = await app.state.login_throttle.check(key)
+        email_key = payload.email.strip().lower()
+        client_ip = request.client.host if request.client else "unknown"
+        ip_key = f"ip:{client_ip}"
+        retry_after = await app.state.login_throttle.check(email_key)
+        ip_retry_after = await app.state.login_throttle.check(ip_key)
+        retry_after = max((value for value in (retry_after, ip_retry_after) if value is not None), default=None)
         if retry_after is not None:
             response = JSONResponse(
                 status_code=429,
@@ -521,10 +551,14 @@ def create_app(
         user = await app.state.control_plane.authenticate(payload.email, payload.password)
         if user is None:
             await app.state.login_throttle.failed(
-                key, limit=config.login_failure_limit, lockout=config.login_lockout_minutes
+                email_key, limit=config.login_failure_limit, lockout=config.login_lockout_minutes
+            )
+            await app.state.login_throttle.failed(
+                ip_key, limit=config.login_failure_limit, lockout=config.login_lockout_minutes
             )
             raise ApiError(401, "invalid_credentials", "email or password is incorrect")
-        await app.state.login_throttle.succeeded(key)
+        await app.state.login_throttle.succeeded(email_key)
+        await app.state.login_throttle.succeeded(ip_key)
         return await _token_pair(app, user)
 
     @app.post("/auth/refresh", response_model=TokenResponse, tags=["auth"])
@@ -563,20 +597,38 @@ def create_app(
     async def create_api_key(payload: ApiKeyCreateRequest, request: Request) -> ApiKeyResponse:
         user = await _require_user(request)
         value, prefix, digest = new_api_key()
+        expires_at = (
+            datetime.now(UTC) + timedelta(days=config.api_key_ttl_days) if config.api_key_ttl_days > 0 else None
+        )
         record = await app.state.control_plane.add_api_key(
             user.id,
             prefix,
             digest,
             label=payload.label.strip() if payload.label else "",
+            expires_at=expires_at,
         )
-        return ApiKeyResponse(id=record.id, prefix=prefix, key=value, label=record.label, created_at=record.created_at)
+        return ApiKeyResponse(
+            id=record.id,
+            prefix=prefix,
+            key=value,
+            label=record.label,
+            created_at=record.created_at,
+            expires_at=record.expires_at,
+        )
 
     @app.get("/auth/api-keys", response_model=list[ApiKeyResponse], tags=["auth"])
     async def list_api_keys(request: Request) -> list[ApiKeyResponse]:
         user = await _require_user(request)
         keys = await app.state.control_plane.list_api_keys(user.id)
         return [
-            ApiKeyResponse(id=key.id, prefix=key.prefix, label=key.label, created_at=key.created_at) for key in keys
+            ApiKeyResponse(
+                id=key.id,
+                prefix=key.prefix,
+                label=key.label,
+                created_at=key.created_at,
+                expires_at=key.expires_at,
+            )
+            for key in keys
         ]
 
     @app.delete("/auth/api-keys/{key_id}", status_code=204, tags=["auth"])
@@ -659,18 +711,18 @@ def create_app(
     ) -> ResurrectResponse:
         user = await _require_user(request)
         project = await _require_project(request, project_id, user)
-        await _check_quota(request, user, project.metadata.get("repo_size_mb"))
         pipeline: dict[str, Any] = {}
         if payload is not None:
             if payload.budget_usd is not None:
                 pipeline["budget_usd"] = payload.budget_usd
             if payload.timeout_seconds is not None:
                 pipeline["timeout_seconds"] = payload.timeout_seconds
-        metadata: dict[str, Any] = {"repo_url": project.repo_url}
-        if pipeline:
-            metadata["pipeline"] = pipeline
-        job = await app.state.control_plane.add_job(project.id, user.id, metadata)
-        await app.state.control_plane.commit_current()
+        pipeline.setdefault("max_repo_mb", config.max_repo_mb)
+        metadata: dict[str, Any] = {"repo_url": project.repo_url, "pipeline": pipeline}
+        async with _quota_lock(user.id):
+            await _check_quota(request, user, project.metadata.get("repo_size_mb"))
+            job = await app.state.control_plane.add_job(project.id, user.id, metadata)
+            await app.state.control_plane.commit_current()
         await app.state.events.publish(job.id, "job.queued", {"status": "queued"})
         _dispatch_job(app, job.id)
         return ResurrectResponse(job_id=job.id)
@@ -679,9 +731,14 @@ def create_app(
     async def create_job(payload: JobCreate, request: Request) -> JobResponse:
         user = await _require_user(request)
         project = await _require_project(request, payload.project_id, user)
-        await _check_quota(request, user, project.metadata.get("repo_size_mb"))
-        job = await app.state.control_plane.add_job(project.id, user.id, {"repo_url": project.repo_url})
-        await app.state.control_plane.commit_current()
+        async with _quota_lock(user.id):
+            await _check_quota(request, user, project.metadata.get("repo_size_mb"))
+            job = await app.state.control_plane.add_job(
+                project.id,
+                user.id,
+                {"repo_url": project.repo_url, "pipeline": {"max_repo_mb": config.max_repo_mb}},
+            )
+            await app.state.control_plane.commit_current()
         await app.state.events.publish(job.id, "job.queued", {"status": "queued"})
         _dispatch_job(app, job.id)
         return _job_response(job)
@@ -815,6 +872,13 @@ def create_app(
         if not project:
             raise ApiError(404, "not_found", "project not found")
         content = MemoryStore.decode_content(payload.content)
+        if len(content) > config.max_capsule_bytes:
+            raise ApiError(
+                413,
+                "capsule_too_large",
+                "capsule exceeds the configured size limit",
+                {"max_capsule_bytes": config.max_capsule_bytes},
+            )
         digest = hashlib.sha256(content).hexdigest()
         declared = payload.sha256 or payload.manifest.get("sha256") or payload.manifest.get("digest")
         if declared and declared != digest:
@@ -862,7 +926,12 @@ def create_app(
             raise ApiError(404, "not_found", "capsule not found")
         return _capsule_response(capsule)
 
-    @app.get("/capsules/{capsule_id}/download", tags=["capsules"])
+    @app.get(
+        "/capsules/{capsule_id}/download",
+        status_code=302,
+        responses={302: {"description": "Redirect to the signed capsule content URL"}},
+        tags=["capsules"],
+    )
     async def download_capsule(capsule_id: str, request: Request) -> RedirectResponse:
         user = await _require_user(request)
         capsule = await app.state.control_plane.get_capsule(capsule_id)
@@ -884,12 +953,10 @@ def create_app(
         capsule = await app.state.control_plane.get_capsule(capsule_id)
         if not capsule or capsule.deleted_at is not None:
             raise ApiError(404, "not_found", "capsule not found")
-        try:
-            content = await app.state.capsule_storage.get(capsule.object_key)
-        except FileNotFoundError as exc:
-            raise ApiError(404, "not_found", "capsule object is missing") from exc
-        return Response(
-            content=content,
+        if not await app.state.capsule_storage.exists(capsule.object_key):
+            raise ApiError(404, "not_found", "capsule object is missing")
+        return StreamingResponse(
+            app.state.capsule_storage.stream(capsule.object_key),
             media_type="application/octet-stream",
             headers={"Content-Disposition": f'attachment; filename="{capsule_id}.revive"'},
         )
@@ -983,9 +1050,13 @@ def create_app(
             key_hint = f"…{plain[-4:]}"
 
         if base_url:
-            parsed = urlparse(base_url)
-            if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-                raise ApiError(400, "llm_settings_invalid", "base_url must be an http(s) URL")
+            from revive_agents.llm import LLMError
+            from revive_agents.llm._http import validate_base_url
+
+            try:
+                validate_base_url(base_url)
+            except LLMError as exc:
+                raise ApiError(400, "llm_settings_invalid", str(exc)) from exc
         if provider != "fake":
             if not model:
                 raise ApiError(400, "llm_settings_invalid", "model is required for this provider")
@@ -1080,8 +1151,61 @@ def create_app(
                     response_model_exclude_defaults=route.response_model_exclude_defaults,
                     response_model_exclude_none=route.response_model_exclude_none,
                     include_in_schema=route.include_in_schema,
+                    responses=route.responses,
                 )
             )
+
+    from fastapi.openapi.utils import get_openapi
+
+    public_operations = {
+        ("get", "/healthz"),
+        ("get", "/readyz"),
+        ("post", "/auth/register"),
+        ("post", "/auth/login"),
+        ("post", "/auth/refresh"),
+        ("post", "/auth/logout"),
+    }
+    worker_operations = {("post", "/jobs/{job_id}/capsule")}
+
+    public_lookup = set()
+    for method, path in public_operations:
+        public_lookup.add((method, path))
+        public_lookup.add((method, "/api/v1" + path))
+    worker_lookup = set()
+    for method, path in worker_operations:
+        worker_lookup.add((method, path))
+        worker_lookup.add((method, "/api/v1" + path))
+
+    def _custom_openapi() -> dict[str, Any]:
+        if app.openapi_schema is not None:
+            return app.openapi_schema
+        document = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        components = document.setdefault("components", {})
+        components.setdefault("securitySchemes", {}).update(
+            {
+                "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
+                "ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-Revive-Key"},
+                "WorkerTokenAuth": {"type": "apiKey", "in": "header", "name": "X-Worker-Token"},
+            }
+        )
+        for path, operations in document.get("paths", {}).items():
+            for method, operation in operations.items():
+                key = (method.lower(), path)
+                if key in public_lookup:
+                    continue
+                if key in worker_lookup:
+                    operation["security"] = [{"WorkerTokenAuth": []}]
+                else:
+                    operation["security"] = [{"BearerAuth": []}, {"ApiKeyAuth": []}]
+        app.openapi_schema = document
+        return document
+
+    app.openapi = _custom_openapi  # type: ignore[method-assign]
 
     return app
 

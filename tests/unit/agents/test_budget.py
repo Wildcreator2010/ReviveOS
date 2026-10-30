@@ -46,6 +46,23 @@ def test_charge_crossing_limit_raises():
         budget.charge(Usage(cost_usd_estimate=0.3))
 
 
+async def test_budget_enforces_a_call_cap_when_cost_rates_are_zero():
+    provider = FakeProvider(
+        responder=[
+            {"json": {"ok": 1}, "usage": {}},
+            {"json": {"ok": 2}, "usage": {}},
+            {"json": {"ok": 3}, "usage": {}},
+        ]
+    )
+    guarded = BudgetedProvider(provider, JobBudget(limit=10.0, max_calls=2))
+
+    await guarded.complete([{"role": "user", "content": "a"}])
+    await guarded.complete([{"role": "user", "content": "b"}])
+    with pytest.raises(BudgetExceeded):
+        await guarded.complete([{"role": "user", "content": "c"}])
+    assert len(provider.calls) == 2
+
+
 async def test_budgeted_provider_fails_at_the_threshold():
     provider = FakeProvider(
         responder=[

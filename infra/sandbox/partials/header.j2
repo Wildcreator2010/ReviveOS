@@ -6,6 +6,6 @@ FROM {{ os_reference }}
 
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8 \
     PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1 \
-    PIP_INDEX_URL={{ pip_index_url | urlv }} PIP_TRUSTED_HOST=pypi.org
+    PIP_INDEX_URL={{ pip_index_url | urlv }}
 LABEL revive.managed="true" revive.python="{{ python_version }}" revive.channel="{{ channel }}"
 

@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from ._adapter_base import HTTPProvider, _Parsed
+from ._http import validate_base_url
 from .base import LLMError, Message, ReasoningEffort
 
 DEFAULT_BASE_URL = "https://api.anthropic.com"
@@ -36,7 +37,9 @@ class AnthropicProvider(HTTPProvider):
         super().__init__(**kwargs)
         self.api_key = api_key
         self.model = model
-        self.base_url = (base_url or DEFAULT_BASE_URL).rstrip("/")
+        resolved_base = (base_url or DEFAULT_BASE_URL).rstrip("/")
+        validate_base_url(resolved_base)
+        self.base_url = resolved_base
         self._endpoint = f"{self.base_url}/v1/messages"
 
     def _headers(self) -> dict[str, str]:

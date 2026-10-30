@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import jsonschema
 
@@ -46,7 +46,7 @@ def load_schema(name: str) -> dict[str, Any]:
     if name not in SCHEMA_FILES:
         raise SchemaNotFoundError(f"unknown schema {name!r}; known: {sorted(SCHEMA_FILES)}")
     path = schemas_dir() / SCHEMA_FILES[name]
-    return json.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
 @lru_cache(maxsize=32)

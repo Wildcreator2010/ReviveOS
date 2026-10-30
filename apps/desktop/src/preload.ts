@@ -1,5 +1,16 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { CHANNELS, type BackendStatus, type DesktopRuntime, type DesktopSettings, type NotifyPayload } from "./channels";
+import type { BackendStatus, DesktopRuntime, DesktopSettings, NotifyPayload } from "./channels";
+
+// Sandboxed preload scripts cannot require local modules; keep these channel
+// strings in sync with channels.ts.
+const CHANNELS = {
+  getSettings: "revive:settings:get",
+  setApiBaseUrl: "revive:settings:set-api-base-url",
+  getRuntime: "revive:runtime:get",
+  notify: "revive:notify",
+  backendStatus: "revive:backend:status",
+  windowState: "revive:window:state",
+} as const;
 
 /**
  * The only surface the renderer gets: no ipcRenderer, no Node, no fs.
