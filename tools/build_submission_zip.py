@@ -19,7 +19,6 @@ import sys
 import time
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -214,7 +213,7 @@ def mp4_info(path: Path) -> dict[str, object]:
             for traf_start, traf_end in children(handle, moof_start, moof_end, b"traf"):
                 tfhd_start, _ = next(children(handle, traf_start, traf_end, b"tfhd"))
                 track_id = read_u32(handle, tfhd_start + 4)
-                for trun_start, trun_end in children(handle, traf_start, traf_end, b"trun"):
+                for trun_start, _trun_end in children(handle, traf_start, traf_end, b"trun"):
                     flags = read_u32(handle, trun_start) & 0xFFFFFF
                     count = read_u32(handle, trun_start + 4)
                     position = trun_start + 8
@@ -355,20 +354,20 @@ def add_bytes(zf: zipfile.ZipFile, entry: Entry, records: list[Record]) -> None:
     info.compress_type = zipfile.ZIP_DEFLATED
     info.external_attr = 0o644 << 16
     zf.writestr(info, entry.data)
-    records.append(
-        Record(entry.archive, len(entry.data), hashlib.sha256(entry.data).hexdigest())
-    )
+    records.append(Record(entry.archive, len(entry.data), hashlib.sha256(entry.data).hexdigest()))
 
 
 def build_manifest(
-    pdf_pages_map: dict[str, int], video_info: dict[str, object], source_count: int,
-    source_bytes: int, git: dict[str, object],
+    pdf_pages_map: dict[str, int],
+    video_info: dict[str, object],
+    source_count: int,
+    source_bytes: int,
+    git: dict[str, object],
 ) -> str:
     repository_url = str(git.get("repository_url") or "")
+    source_mib = source_bytes / 1024 / 1024
     if repository_url:
-        repository_line = (
-            f"1. **公开代码仓库**：已推送至 {repository_url}；提交前用未登录浏览器复核可访问性。"
-        )
+        repository_line = f"1. **公开代码仓库**：已推送至 {repository_url}；提交前用未登录浏览器复核可访问性。"
         remaining_links = "仅公开视频播放链接未勾选"
     else:
         repository_line = (
@@ -376,37 +375,46 @@ def build_manifest(
             "确认未登录状态可访问，再把 URL 填入提交表。当前仓库没有 remote，也没有已推送的历史版本。"
         )
         remaining_links = "公开仓库地址与公开视频链接均未勾选"
+    video_line = (
+        "2. **公开视频链接**：把 `03-演示视频/reviveos-film-4min.mp4` 上传到评审可访问的平台，"
+        "确认无需登录、无提取码或单独注明，再填入播放页 URL。"
+    )
+    repro_line = (
+        "源码安装、启动、测试和生产编排见 `05-源码/ReviveOS/README.md`、`DELIVERY.md` 与 "
+        "`docs/production-readiness.md`。"
+        "完整复生路径需要 Docker、PostgreSQL、Redis 与 S3；仅解压源码不会自动启动服务。"
+    )
     return f"""# ReviveOS 提交包
 
 生成日期：2026-10-30  
-源码版本：`{git['commit']}`（工作区含 {git['dirty_entries']} 项未提交改动，非 Git tag）  
-公开仓库：{git['repository_url'] or '未配置'}  
+源码版本：`{git["commit"]}`（工作区含 {git["dirty_entries"]} 项未提交改动，非 Git tag）  
+公开仓库：{git["repository_url"] or "未配置"}  
 公开视频：尚无播放链接
 
 ## 包内结构
 
 | 路径 | 内容 |
 | --- | --- |
-| `01-作品介绍/` | 作品介绍 PDF（{pdf_pages_map['intro']} 页）与可编辑 HTML |
-| `02-使用方案/` | 详细使用方案 PDF（{pdf_pages_map['usage']} 页）、Markdown 与 HTML |
+| `01-作品介绍/` | 作品介绍 PDF（{pdf_pages_map["intro"]} 页）与可编辑 HTML |
+| `02-使用方案/` | 详细使用方案 PDF（{pdf_pages_map["usage"]} 页）、Markdown 与 HTML |
 | `03-演示视频/` | 四分钟发布片；可选 80 秒宣传片 |
 | `04-提交信息/` | 提交材料清单与视频参数 |
-| `05-源码/ReviveOS/` | 源码、测试、依赖锁文件与部署配置（{source_count} 个文件，{source_bytes / 1024 / 1024:.2f} MiB） |
+| `05-源码/ReviveOS/` | 源码、测试、依赖锁与部署配置（{source_count} 个文件，{source_mib:.2f} MiB） |
 | `SHA256SUMS.txt` | 本包内除自身外所有文件的 SHA-256 |
 
 ## 提交前仍需完成
 
 {repository_line}
-2. **公开视频链接**：把 `03-演示视频/reviveos-film-4min.mp4` 上传到评审可访问的平台，确认无需登录、无提取码或单独注明，再填入播放页 URL。
+{video_line}
 3. **重新核对提交表**：`04-提交信息/ReviveOS-提交材料.md` 中{remaining_links}。
 
 ## 已核验的素材
 
 | 素材 | 核验结果 |
 | --- | --- |
-| 作品介绍 PDF | {pdf_pages_map['intro']} 页，`%PDF` 文件头 |
-| 使用方案 PDF | {pdf_pages_map['usage']} 页，`%PDF` 文件头 |
-| 四分钟发布片 | 1920×1080，{video_info['duration']} 秒，H.264 + AAC，含音轨 |
+| 作品介绍 PDF | {pdf_pages_map["intro"]} 页，`%PDF` 文件头 |
+| 使用方案 PDF | {pdf_pages_map["usage"]} 页，`%PDF` 文件头 |
+| 四分钟发布片 | 1920×1080，{video_info["duration"]} 秒，H.264 + AAC，含音轨 |
 | 源码 | 不含 `.git`、`.env`、密钥、依赖缓存、虚拟环境与本机运行产物 |
 
 四分钟发布片为 `03-演示视频/reviveos-film-4min.mp4`；80 秒宣传片是可选项，不作为四分钟演示提交。
@@ -421,7 +429,7 @@ def build_manifest(
 
 ## 复现
 
-源码安装、启动、测试和生产编排见 `05-源码/ReviveOS/README.md`、`DELIVERY.md` 与 `docs/production-readiness.md`。完整复生路径需要 Docker、PostgreSQL、Redis 与 S3；仅解压源码不会自动启动服务。
+{repro_line}
 
 提交材料中的生产验收结论由项目方确认；源码文档仍保留环境限制与未覆盖项，提交前请以实际部署环境复核。
 """
@@ -455,13 +463,19 @@ def main() -> int:
 
     git = git_state()
     manifest = build_manifest(
-        {"intro": intro_pages, "usage": usage_pages}, film_info, source_count,
-        source_bytes, git,
+        {"intro": intro_pages, "usage": usage_pages},
+        film_info,
+        source_count,
+        source_bytes,
+        git,
     )
 
     records: list[Record] = []
     with zipfile.ZipFile(
-        partial, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6,
+        partial,
+        "w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=6,
         allowZip64=True,
     ) as zf:
         add_bytes(zf, Entry(f"{ARCHIVE_ROOT}/00-提交包说明.md", None, manifest.encode("utf-8")), records)
@@ -487,9 +501,14 @@ def main() -> int:
         assert len(names) == source_count + len(ARTIFACTS) + 2
         assert all(not name.startswith("/") and ".." not in Path(name).parts for name in names)
         forbidden = [
-            name for name in names
-            if "/.git/" in name or "/node_modules/" in name or name.endswith("/.env")
-            or "/.venv/" in name or "/.scratch/" in name or "/__pycache__/" in name
+            name
+            for name in names
+            if "/.git/" in name
+            or "/node_modules/" in name
+            or name.endswith("/.env")
+            or "/.venv/" in name
+            or "/.scratch/" in name
+            or "/__pycache__/" in name
         ]
         assert not forbidden, forbidden[:10]
         checksum_text = zf.read(f"{ARCHIVE_ROOT}/SHA256SUMS.txt").decode("utf-8")
