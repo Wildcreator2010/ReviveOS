@@ -30,7 +30,7 @@ revive-cli = { workspace = true }
 revive-api = { workspace = true }
 
 [tool.pytest.ini_options]
-pythonpath = ["cli/src", "packages/core/src", "agents/src", "apps/api/src"]
+pythonpath = [".", "cli/src", "packages/core/src", "agents/src", "apps/api/src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
